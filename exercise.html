@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -234,6 +234,151 @@
       }
 
       window.addEventListener("beforeunload", stopExercise);
+  </script>
+</body>
+</html> 
+
+
+ -->
+
+
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exercise Monitoring</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="exercise-header">
+      <h1 id="exercise-name">Exercise</h1>
+      <button id="stop-btn">Stop Exercise</button>
+    </header>
+    
+    <main class="exercise-container">
+      <div class="stats-panel">
+        <div class="stat-box">
+          <h3>REPS</h3>
+          <div id="rep-counter" class="counter">0</div>
+        </div>
+        
+        <div class="stat-box">
+          <h3>FORM</h3>
+          <div id="form-status" class="status">OK</div>
+        </div>
+      </div>
+      
+      <div class="video-feed">
+        <div class="video-placeholder">
+          <video id="camera-stream" autoplay playsinline width="640" height="480"></video>
+          <canvas id="capture-canvas" width="640" height="480" style="display:none;"></canvas>
+        </div>
+      </div>
+      
+      <div class="feedback-panel">
+        <h3>FEEDBACK</h3>
+        <div id="feedback-text" class="feedback-text">No feedback yet</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let ws = null;
+    let frameInterval = null;
+    const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
+    document.addEventListener("DOMContentLoaded", () => {
+      initializeCamera();
+      initializeWebSocket();
+      setupEventListeners();
+    });
+
+    function initializeCamera() {
+      const video = document.getElementById("camera-stream");
+      const canvas = document.getElementById("capture-canvas");
+      const ctx = canvas.getContext("2d");
+
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          video.srcObject = stream;
+
+          frameInterval = setInterval(() => {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const frameData = canvas.toDataURL("image/jpeg");
+
+            fetch(`${API_BASE_URL}/upload_frame`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ frame: frameData })
+            }).catch(err => console.error("Frame upload failed:", err));
+          }, 100);
+        })
+        .catch(err => {
+          console.error("Camera access denied:", err);
+          alert("Please allow camera access to use this feature.");
+        });
+    }
+
+    function initializeWebSocket() {
+      const wsUrl = `wss://yalla-ai.onlinetestingserver.com/v1/exercise/ws`; 
+      
+      ws = new WebSocket(wsUrl);
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          updateUI(data);
+        } catch (error) {
+          console.error("Error parsing WebSocket message:", error);
+        }
+      };
+    }
+
+    function updateUI(data) {
+      if (data.exercise) {
+        document.getElementById("exercise-name").textContent = data.exercise;
+      }
+      if (data.reps !== undefined) {
+        document.getElementById("rep-counter").textContent = data.reps;
+      }
+      if (data.form_ok !== undefined) {
+        const formStatus = document.getElementById("form-status");
+        formStatus.textContent = data.form_ok ? "OK" : "FIX";
+        formStatus.className = "status " + (data.form_ok ? "good" : "bad");
+      }
+      if (data.feedback !== undefined) {
+        document.getElementById("feedback-text").textContent = data.feedback || "No feedback yet";
+      }
+    }
+
+    function setupEventListeners() {
+      document.getElementById("stop-btn").addEventListener("click", () => {
+        if (frameInterval) {
+          clearInterval(frameInterval);
+        }
+        if (ws) {
+          ws.close();
+        }
+
+        fetch(`${API_BASE_URL}/stop`, { method: "POST" })
+          .then(response => response.json())
+          .then(data => {
+            if (data.status === "stopped") {
+              window.location.href = "index.html";
+            }
+          })
+          .catch(error => {
+            console.error("Error stopping exercise:", error);
+            alert("Failed to stop exercise");
+          });
+      });
+    }
+
+    window.addEventListener("beforeunload", () => {
+      if (frameInterval) clearInterval(frameInterval);
+      if (ws) ws.close();
+    });
   </script>
 </body>
 </html>
