@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -33,11 +32,14 @@
       
       <div class="video-feed">
         <div class="video-placeholder" style="position: relative; display:inline-block;">
-          <!-- raw camera -->
+          <!-- Hidden raw camera (only for processing) -->
           <video id="camera-stream" autoplay playsinline width="640" height="480" style="display:none;"></video>
-          <!-- overlay with landmarks -->
-          <canvas id="overlay-canvas" width="640" height="480"></canvas>
-          <!-- hidden canvas for backend uploads -->
+          
+          <!-- Main canvas where video + landmarks are drawn -->
+          <canvas id="overlay-canvas" width="640" height="480" 
+                  style="border:2px solid #444; border-radius:8px;"></canvas>
+
+          <!-- Hidden canvas for backend uploads -->
           <canvas id="capture-canvas" width="640" height="480" style="display:none;"></canvas>
         </div>
       </div>
@@ -82,16 +84,20 @@
 
           pose.onResults(results => {
             ctx.clearRect(0, 0, overlay.width, overlay.height);
-            ctx.drawImage(results.image, 0, 0, overlay.width, overlay.height);
 
-            if (results.poseLandmarks) {
-                drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS,
-                              { color: "lime", lineWidth: 3 });
-
-                drawLandmarks(ctx, results.poseLandmarks,
-                              { color: "red", radius: 4 });
+            // ✅ Draw video feed first
+            if (results.image) {
+              ctx.drawImage(results.image, 0, 0, overlay.width, overlay.height);
             }
-        });
+
+            // ✅ Draw landmarks + skeleton
+            if (results.poseLandmarks) {
+              drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS,
+                            { color: "lime", lineWidth: 3 });
+              drawLandmarks(ctx, results.poseLandmarks,
+                            { color: "red", radius: 4 });
+            }
+          });
 
           const camera = new Camera(video, {
               onFrame: async () => {
@@ -228,4 +234,3 @@
   </script>
 </body>
 </html>
-
