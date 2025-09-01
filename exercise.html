@@ -1,4 +1,4 @@
-<!-- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -41,9 +41,8 @@
   </div>
 
   <script>
-      // DEFINE THE BASE URL OF YOUR DOCKERIZED BACKEND
-      //const API_BASE_URL = 'http://localhost';
-      const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com';
+      // const API_BASE_URL = 'http://localhost';
+      const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
 
       let ws = null;
       let frameInterval = null;
@@ -89,33 +88,38 @@
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           
           // Convert the canvas to a base64 data URL (e.g., "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ...")
-          const frameData = canvas.toDataURL("image/jpeg", 0.6); // Use lower quality for smaller size
+          // const frameData = canvas.toDataURL("image/jpeg", 0.6);
+          canvas.toBlob((blob) => {
+            if (!blob) {
+                isProcessing = false;
+                return;
+            }
 
-          // Send the frame to the BACKEND'S HTTP POST ENDPOINT
-          fetch(`${API_BASE_URL}/v1/exercise/upload_frame`, {
-              method: "POST",
-              headers: {
-                  "Content-Type": "application/json"
-              },
-              body: JSON.stringify({ frame: frameData }) // Send the base64 string
-          })
-          .then(response => response.json())
-          .then(data => {
-                console.log(data)
-              isProcessing = false;
-              if (data.status === "error") {
-                  console.error("Backend error processing frame:", data.message);
-              }
-          })
-          .catch(error => {
-              console.error("Failed to upload frame to server:", error);
-              isProcessing = false;
-          });
+            fetch(`${API_BASE_URL}/v1/exercise/upload_frame`, {
+                method: "POST",
+                headers: {
+                    // Tell backend it's raw JPEG
+                    "Content-Type": "image/jpeg"
+                },
+                body: blob // Send binary directly
+            })
+            .then(response => response.json())
+            .then(data => {
+                isProcessing = false;
+                if (data.status === "error") {
+                    console.error("Backend error:", data.message);
+                }
+            })
+            .catch(error => {
+                console.error("Upload failed:", error);
+                isProcessing = false;
+            });
+        }, "image/jpeg", 0.6);
       }
 
       // THIS WEBSOCKET IS ONLY FOR RECEIVING REAL-TIME UPDATES FROM THE SERVER
       function initializeWebSocket() {
-          //const wsUrl = `ws://localhost/v1/exercise/ws`; 
+          // const wsUrl = `ws://localhost/v1/exercise/ws`; 
           const wsUrl = `wss://yalla-ai.onlinetestingserver.com/v1/exercise/ws`; 
           
           ws = new WebSocket(wsUrl);
@@ -183,202 +187,57 @@
           document.getElementById("stop-btn").addEventListener("click", stopExercise);
       }
 
-      function stopExercise() {
-    // Cleanup resources FIRST
-    if (frameInterval) {
-        clearInterval(frameInterval);
-        frameInterval = null;
-    }
-    if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-        reconnectTimeout = null;
-    }
-    isProcessing = false;
-    
-    const currentWs = ws;
-    if (currentWs) {
-        // Close the WebSocket but don't set to null yet
-        currentWs.close();
-    }
-
-    // Call the backend's stop endpoint
-    fetch(`${API_BASE_URL}/v1/exercise/stop`, {
-        method: "POST"
-    })
-    .then(response => {
-        if (!response.ok) {
-            // If we get a 400 error, it likely means no active session (which is fine)
-            if (response.status === 400) {
-                return { status: "already_stopped" };
-            }
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log("Stop response:", data);
-        if (data.status === "stopped" || data.status === "already_stopped") {
-            // Successfully stopped or was already stopped
-            ws = null;
-            window.location.href = "index.html";
-        } else {
-            throw new Error(`Unexpected response: ${JSON.stringify(data)}`);
-        }
-    })
-    .catch(error => {
-        console.error("Error stopping exercise:", error);
-        ws = null;
-        alert("Exercise session ended. Returning to home page.");
-        window.location.href = "index.html";
-    });
+    function stopExercise() {
+      // Cleanup resources FIRST
+      if (frameInterval) {
+          clearInterval(frameInterval);
+          frameInterval = null;
       }
+      if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+          reconnectTimeout = null;
+      }
+      isProcessing = false;
+      
+      const currentWs = ws;
+      if (currentWs) {
+          // Close the WebSocket but don't set to null yet
+          currentWs.close();
+      }
+
+      // Call the backend's stop endpoint
+      fetch(`${API_BASE_URL}/v1/exercise/stop`, {
+          method: "POST"
+      })
+      .then(response => {
+          if (!response.ok) {
+              // If we get a 400 error, it likely means no active session (which is fine)
+              if (response.status === 400) {
+                  return { status: "already_stopped" };
+              }
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+      })
+      .then(data => {
+          console.log("Stop response:", data);
+          if (data.status === "stopped" || data.status === "already_stopped") {
+              // Successfully stopped or was already stopped
+              ws = null;
+              window.location.href = "index.html";
+          } else {
+              throw new Error(`Unexpected response: ${JSON.stringify(data)}`);
+          }
+      })
+      .catch(error => {
+          console.error("Error stopping exercise:", error);
+          ws = null;
+          alert("Exercise session ended. Returning to home page.");
+          window.location.href = "index.html";
+      });
+    }
 
       window.addEventListener("beforeunload", stopExercise);
   </script>
 </body>
 </html> 
-
-
- -->
-
-
- <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Exercise Monitoring</title>
-  <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-  <div class="container">
-    <header class="exercise-header">
-      <h1 id="exercise-name">Exercise</h1>
-      <button id="stop-btn">Stop Exercise</button>
-    </header>
-    
-    <main class="exercise-container">
-      <div class="stats-panel">
-        <div class="stat-box">
-          <h3>REPS</h3>
-          <div id="rep-counter" class="counter">0</div>
-        </div>
-        
-        <div class="stat-box">
-          <h3>FORM</h3>
-          <div id="form-status" class="status">OK</div>
-        </div>
-      </div>
-      
-      <div class="video-feed">
-        <div class="video-placeholder">
-          <video id="camera-stream" autoplay playsinline width="640" height="480"></video>
-          <canvas id="capture-canvas" width="640" height="480" style="display:none;"></canvas>
-        </div>
-      </div>
-      
-      <div class="feedback-panel">
-        <h3>FEEDBACK</h3>
-        <div id="feedback-text" class="feedback-text">No feedback yet</div>
-      </div>
-    </main>
-  </div>
-
-  <script>
-    let ws = null;
-    let frameInterval = null;
-    const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
-    document.addEventListener("DOMContentLoaded", () => {
-      initializeCamera();
-      initializeWebSocket();
-      setupEventListeners();
-    });
-
-    function initializeCamera() {
-      const video = document.getElementById("camera-stream");
-      const canvas = document.getElementById("capture-canvas");
-      const ctx = canvas.getContext("2d");
-
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          video.srcObject = stream;
-
-          frameInterval = setInterval(() => {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const frameData = canvas.toDataURL("image/jpeg");
-
-            fetch(`${API_BASE_URL}/upload_frame`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ frame: frameData })
-            }).catch(err => console.error("Frame upload failed:", err));
-          }, 100);
-        })
-        .catch(err => {
-          console.error("Camera access denied:", err);
-          alert("Please allow camera access to use this feature.");
-        });
-    }
-
-    function initializeWebSocket() {
-      const wsUrl = `wss://yalla-ai.onlinetestingserver.com/v1/exercise/ws`; 
-      
-      ws = new WebSocket(wsUrl);
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          updateUI(data);
-        } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
-        }
-      };
-    }
-
-    function updateUI(data) {
-      if (data.exercise) {
-        document.getElementById("exercise-name").textContent = data.exercise;
-      }
-      if (data.reps !== undefined) {
-        document.getElementById("rep-counter").textContent = data.reps;
-      }
-      if (data.form_ok !== undefined) {
-        const formStatus = document.getElementById("form-status");
-        formStatus.textContent = data.form_ok ? "OK" : "FIX";
-        formStatus.className = "status " + (data.form_ok ? "good" : "bad");
-      }
-      if (data.feedback !== undefined) {
-        document.getElementById("feedback-text").textContent = data.feedback || "No feedback yet";
-      }
-    }
-
-    function setupEventListeners() {
-      document.getElementById("stop-btn").addEventListener("click", () => {
-        if (frameInterval) {
-          clearInterval(frameInterval);
-        }
-        if (ws) {
-          ws.close();
-        }
-
-        fetch(`${API_BASE_URL}/stop`, { method: "POST" })
-          .then(response => response.json())
-          .then(data => {
-            if (data.status === "stopped") {
-              window.location.href = "index.html";
-            }
-          })
-          .catch(error => {
-            console.error("Error stopping exercise:", error);
-            alert("Failed to stop exercise");
-          });
-      });
-    }
-
-    window.addEventListener("beforeunload", () => {
-      if (frameInterval) clearInterval(frameInterval);
-      if (ws) ws.close();
-    });
-  </script>
-</body>
-</html>
