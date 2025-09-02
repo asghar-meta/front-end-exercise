@@ -9,7 +9,6 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-
 </head>
 <body>
     <div class="container">
@@ -25,11 +24,11 @@
                 <h2>Choose Exercise</h2>
                 <select id="exercise-select">
                     <option value="">-- Select Exercise --</option>
-                    <option value="barbell biceps curl">barbell biceps curl</option></option>
-                    <option value="squat">squat</option></option>
-                    <option value="push-up">push ups</option></option>
-                    <option value="plank">plank</option></option>
-                    <option value="deadlift">deadlift</option></option>
+                    <option value="barbell biceps curl">barbell biceps curl</option>
+                    <option value="squat">squat</option>
+                    <option value="push-up">push ups</option>
+                    <option value="plank">plank</option>
+                    <option value="deadlift">deadlift</option>
                 </select>
                 <button id="start-btn" disabled>Start Exercise</button>
             </div>
@@ -50,15 +49,18 @@
             if (exercise) {
                 fetch(`${API_BASE_URL}/start`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ exercise: exercise })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ exercise })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'started') {
+                        // ✅ Save session & exercise
+                        localStorage.setItem("sessionId", data.session_id);
+                        localStorage.setItem("exerciseName", exercise);
                         window.location.href = '/exercise.html';
+                    } else {
+                        alert("Failed to start exercise: " + (data.message || "Unknown error"));
                     }
                 })
                 .catch(error => {

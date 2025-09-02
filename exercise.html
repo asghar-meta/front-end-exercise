@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Exercise Monitoring</title>
   <link rel="stylesheet" href="/static/style.css">
-  <!-- ✅ Mediapipe JS -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
@@ -52,7 +51,7 @@
   </div>
 
   <script>
-      // const API_BASE_URL = 'http://localhost:8000';
+    //   const API_BASE_URL = 'http://localhost:8000';
       const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com';
 
       let ws = null;
@@ -60,7 +59,17 @@
       let isProcessing = false; 
       let reconnectTimeout = null;
 
+      const sessionId = localStorage.getItem("sessionId");
+      const exerciseName = localStorage.getItem("exerciseName");
+        console.log('session id: ', sessionId)
       document.addEventListener("DOMContentLoaded", () => {
+          if (!sessionId) {
+              alert("No active session. Redirecting...");
+              window.location.href = "index.html";
+              return;
+          }
+          document.getElementById("exercise-name").textContent = exerciseName || "Exercise";
+
           initializeMediapipe(); 
           initializeWebSocket(); 
           setupEventListeners();
@@ -85,12 +94,10 @@
           pose.onResults(results => {
             ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-            // ✅ Draw video feed first
             if (results.image) {
               ctx.drawImage(results.image, 0, 0, overlay.width, overlay.height);
             }
 
-            // ✅ Draw landmarks + skeleton
             if (results.poseLandmarks) {
               drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS,
                             { color: "lime", lineWidth: 3 });
@@ -112,7 +119,6 @@
           frameInterval = setInterval(captureAndSendFrame, 125); 
       }
 
-      // ✅ Send frames to backend for processing
       function captureAndSendFrame() {
           if (isProcessing) return;
           isProcessing = true;
@@ -129,7 +135,7 @@
                 return;
             }
 
-            fetch(`${API_BASE_URL}/v1/exercise/upload_frame`, {
+            fetch(`${API_BASE_URL}/v1/exercise/upload_frame?session_id=${sessionId}`, {
                 method: "POST",
                 headers: { "Content-Type": "image/jpeg" },
                 body: blob
@@ -148,9 +154,10 @@
         }, "image/jpeg", 0.6);
       }
 
-      // ✅ Websocket still handles reps/feedback
       function initializeWebSocket() {
-          const wsUrl = `wss://yalla-ai.onlinetestingserver.com/v1/exercise/ws`; 
+          const wsUrl = `wss://yalla-ai.onlinetestingserver.com/v1/exercise/ws?session_id=${sessionId}`;
+        //   const wsUrl = `ws://localhost:8000/v1/exercise/ws?session_id=${sessionId}`;
+
           ws = new WebSocket(wsUrl);
 
           ws.onopen = () => {
@@ -223,9 +230,11 @@
               ws.close();
           }
 
-          fetch(`${API_BASE_URL}/v1/exercise/stop`, { method: "POST" })
+          fetch(`${API_BASE_URL}/v1/exercise/stop?session_id=${sessionId}`, { method: "POST" })
           .finally(() => {
               ws = null;
+              localStorage.removeItem("sessionId");
+              localStorage.removeItem("exerciseName");
               window.location.href = "index.html";
           });
       }
