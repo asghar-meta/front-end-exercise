@@ -55,10 +55,9 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'started') {
-                        // ✅ Save session & exercise
                         localStorage.setItem("sessionId", data.session_id);
                         localStorage.setItem("exerciseName", exercise);
-                        window.location.href = '/exercise.html';
+                        window.location.href = 'exercise.html';
                     } else {
                         alert("Failed to start exercise: " + (data.message || "Unknown error"));
                     }

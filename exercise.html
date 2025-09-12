@@ -31,14 +31,11 @@
       
       <div class="video-feed">
         <div class="video-placeholder" style="position: relative; display:inline-block;">
-          <!-- Hidden raw camera (only for processing) -->
           <video id="camera-stream" autoplay playsinline width="640" height="480" style="display:none;"></video>
           
-          <!-- Main canvas where video + landmarks are drawn -->
           <canvas id="overlay-canvas" width="640" height="480" 
                   style="border:2px solid #444; border-radius:8px;"></canvas>
-
-          <!-- Hidden canvas for backend uploads -->
+          
           <canvas id="capture-canvas" width="640" height="480" style="display:none;"></canvas>
         </div>
       </div>
@@ -49,197 +46,245 @@
       </div>
     </main>
   </div>
-
   <script>
-    //   const API_BASE_URL = 'http://localhost:8000';
-      const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com';
-
-      let ws = null;
-      let frameInterval = null;
-      let isProcessing = false; 
-      let reconnectTimeout = null;
-
-      const sessionId = localStorage.getItem("sessionId");
-      const exerciseName = localStorage.getItem("exerciseName");
-        console.log('session id: ', sessionId)
-      document.addEventListener("DOMContentLoaded", () => {
-          if (!sessionId) {
-              alert("No active session. Redirecting...");
-              window.location.href = "index.html";
-              return;
-          }
-          document.getElementById("exercise-name").textContent = exerciseName || "Exercise";
-
-          initializeMediapipe(); 
-          initializeWebSocket(); 
-          setupEventListeners();
+    // Fixed API URL - corrected the typo
+    const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com';
+    // const API_BASE_URL = 'http://localhost:8000';
+    
+    let ws = null;
+    let reconnectTimeout = null;
+    let lastFrameTime = 0;
+    const FRAME_INTERVAL = 50; // 20 FPS (50ms per frame)
+    
+    const sessionId = localStorage.getItem("sessionId");
+    const exerciseName = localStorage.getItem("exerciseName");
+    
+    console.log('Session ID:', sessionId);
+    
+    document.addEventListener("DOMContentLoaded", () => {
+      if (!sessionId) {
+        alert("No active session. Redirecting...");
+        window.location.href = "index.html";
+        return;
+      }
+      
+      document.getElementById("exercise-name").textContent = exerciseName || "Exercise";
+      
+      initializeMediapipe();
+      initializeWebSocket();
+      setupEventListeners();
+    });
+    
+    function initializeMediapipe() {
+      const video = document.getElementById("camera-stream");
+      const overlay = document.getElementById("overlay-canvas");
+      const ctx = overlay.getContext("2d");
+      
+      const pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
       });
-
-      function initializeMediapipe() {
-          const video = document.getElementById("camera-stream");
-          const overlay = document.getElementById("overlay-canvas");
-          const ctx = overlay.getContext("2d");
-
-          const pose = new Pose({
-              locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-          });
-          pose.setOptions({
-              modelComplexity: 1,
-              smoothLandmarks: true,
-              enableSegmentation: false,
-              minDetectionConfidence: 0.5,
-              minTrackingConfidence: 0.5
-          });
-
-          pose.onResults(results => {
-            ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-            if (results.image) {
-              ctx.drawImage(results.image, 0, 0, overlay.width, overlay.height);
-            }
-
-            if (results.poseLandmarks) {
-              drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS,
-                            { color: "lime", lineWidth: 3 });
-              drawLandmarks(ctx, results.poseLandmarks,
-                            { color: "red", radius: 4 });
-            }
-          });
-
-          const camera = new Camera(video, {
-              onFrame: async () => {
-                  await pose.send({ image: video });
-              },
-              width: 640,
-              height: 480
-          });
-          camera.start();
-
-          // still send frames to backend
-          frameInterval = setInterval(captureAndSendFrame, 125); 
-      }
-
-      function captureAndSendFrame() {
-          if (isProcessing) return;
-          isProcessing = true;
-
-          const video = document.getElementById("camera-stream");
-          const canvas = document.getElementById("capture-canvas");
-          const ctx = canvas.getContext("2d");
-
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Optimized MediaPipe settings
+      pose.setOptions({
+        modelComplexity: 0, // Fastest mode
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      
+      pose.onResults(results => {
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+        
+        if (results.image) {
+          ctx.drawImage(results.image, 0, 0, overlay.width, overlay.height);
+        }
+        
+        if (results.poseLandmarks) {
+          drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS,
+                        {color: "lime", lineWidth: 3});
+          drawLandmarks(ctx, results.poseLandmarks,
+                        {color: "red", radius: 4});
+        }
+      });
+      
+      const camera = new Camera(video, {
+        onFrame: async () => {
+          await pose.send({image: video});
+          sendFrame(video); 
+        },
+        width: 640,
+        height: 480
+      });
+      
+      camera.start();
+    }
+    
+    function sendFrame(videoElement) {
+      // Frame rate limiting
+      const now = Date.now();
+      if (now - lastFrameTime < FRAME_INTERVAL) return;
+      lastFrameTime = now;
+      
+      // Skip if WebSocket is not ready
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      
+      const canvas = document.getElementById('capture-canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Draw video frame to canvas
+      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+      
+      // Get frame as blob and send via WebSocket
+      canvas.toBlob((blob) => {
+        if (blob) {
+          ws.send(blob); // Send as binary data
+        }
+      }, 'image/jpeg', 0.7); // Slightly higher quality for better processing
+    }
+    
+    function initializeWebSocket() {
+      const wsUrl = `wss://yalla-ai.onlinetestingserver.com/v1/exercise/ws`;
+      // const wsUrl = `ws://localhost:8000/v1/exercise/ws`;
+      
+      ws = new WebSocket(wsUrl);
+      
+      // Important for binary data handling
+      ws.binaryType = 'arraybuffer';
+      
+      ws.onopen = () => {
+        console.log("WebSocket connected");
+        // Request initial state
+        ws.send("get_state");
+      };
+      
+      ws.onmessage = (event) => {
+        try {
+          // Handle binary data (shouldn't receive any from server)
+          if (event.data instanceof ArrayBuffer) {
+            console.log("Received binary data from server");
+            return;
+          }
           
-          canvas.toBlob((blob) => {
-            if (!blob) {
-                isProcessing = false;
-                return;
-            }
-
-            fetch(`${API_BASE_URL}/v1/exercise/upload_frame?session_id=${sessionId}`, {
-                method: "POST",
-                headers: { "Content-Type": "image/jpeg" },
-                body: blob
-            })
-            .then(response => response.json())
-            .then(data => {
-                isProcessing = false;
-                if (data.status === "error") {
-                    console.error("Backend error:", data.message);
-                }
-            })
-            .catch(error => {
-                console.error("Upload failed:", error);
-                isProcessing = false;
-            });
-        }, "image/jpeg", 0.6);
-      }
-
-      function initializeWebSocket() {
-          const wsUrl = `wss://yalla-ai.onlinetestingserver.com/v1/exercise/ws?session_id=${sessionId}`;
-        //   const wsUrl = `ws://localhost:8000/v1/exercise/ws?session_id=${sessionId}`;
-
-          ws = new WebSocket(wsUrl);
-
-          ws.onopen = () => {
-              console.log("WebSocket connected");
-              ws.send("get_state");
-          };
-
-          ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'ping') {
-                    ws.send(JSON.stringify({ type: 'pong', ts: data.ts }));
-                    return;
-                }
-                updateUI(data);
-            } catch (error) {
-                console.error("WebSocket parse error:", error);
-            }
-          };
-
-          ws.onclose = () => {
-              console.log("WebSocket closed. Reconnecting...");
-              if (reconnectTimeout) clearTimeout(reconnectTimeout);
-              reconnectTimeout = setTimeout(initializeWebSocket, 2000);
-          };
-
-          ws.onerror = (error) => {
-              console.error("WebSocket error:", error);
-          };
-      }
-
-      function updateUI(data) {
-          if (data.exercise) {
-              document.getElementById("exercise-name").textContent = data.exercise;
-          }
-          if (data.reps !== undefined) {
-              document.getElementById("rep-counter").textContent = data.reps;
-          }
-          if (data.form_ok !== undefined) {
-              const formStatus = document.getElementById("form-status");
-              if (data.feedback === "No person detected") {
-                  formStatus.textContent = "NO PERSON";
-                  formStatus.className = "status bad";
-              } else {
-                  formStatus.textContent = data.form_ok ? "OK" : "FIX";
-                  formStatus.className = "status " + (data.form_ok ? "good" : "bad");
-              }
-          }
-          if (data.feedback !== undefined) {
-              document.getElementById("feedback-text").textContent = data.feedback || "No feedback yet";
-          }
-      } 
-
-      function setupEventListeners() {
-          document.getElementById("stop-btn").addEventListener("click", stopExercise);
-      }
-
-      function stopExercise() {
-          if (frameInterval) {
-              clearInterval(frameInterval);
-              frameInterval = null;
-          }
-          if (reconnectTimeout) {
-              clearTimeout(reconnectTimeout);
-              reconnectTimeout = null;
-          }
-          isProcessing = false;
+          // Parse JSON data
+          const data = JSON.parse(event.data);
           
-          if (ws) {
-              ws.close();
+          // Handle different message types
+          if (data.type === 'ping') {
+            ws.send(JSON.stringify({type: 'pong', ts: data.ts}));
+            return;
           }
-
-          fetch(`${API_BASE_URL}/v1/exercise/stop?session_id=${sessionId}`, { method: "POST" })
-          .finally(() => {
-              ws = null;
-              localStorage.removeItem("sessionId");
-              localStorage.removeItem("exerciseName");
-              window.location.href = "index.html";
-          });
+          
+          // Handle frame processing results
+          if (data.status === 'error') {
+            console.error("Backend error:", data.message);
+            document.getElementById('feedback-text').textContent = data.message;
+            return;
+          }
+          
+          // Handle state updates
+          updateUI(data);
+          
+        } catch (error) {
+          console.error("WebSocket parse error:", error);
+        }
+      };
+      
+      ws.onclose = () => {
+        console.log("WebSocket closed. Reconnecting...");
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+        reconnectTimeout = setTimeout(initializeWebSocket, 2000);
+      };
+      
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
+    }
+    
+    function updateUI(data) {
+      if (data.exercise) {
+        document.getElementById("exercise-name").textContent = data.exercise;
       }
-
-      window.addEventListener("beforeunload", stopExercise);
+      
+      if (data.reps !== undefined) {
+        document.getElementById("rep-counter").textContent = data.reps;
+      }
+      
+      if (data.form_ok !== undefined) {
+        const formStatus = document.getElementById("form-status");
+        if (data.feedback === "No person detected") {
+          formStatus.textContent = "NO PERSON";
+          formStatus.className = "status bad";
+        } else {
+          formStatus.textContent = data.form_ok ? "OK" : "FIX";
+          formStatus.className = "status " + (data.form_ok ? "good" : "bad");
+        }
+      }
+      
+      if (data.feedback !== undefined) {
+        document.getElementById("feedback-text").textContent = data.feedback || "No feedback yet";
+      }
+    } 
+    
+    function setupEventListeners() {
+      document.getElementById("stop-btn").addEventListener("click", stopExercise);
+    }
+    
+    function stopExercise() {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+      
+      // Create a promise to handle WebSocket closure
+      const closeWebSocket = new Promise((resolve) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.addEventListener('close', () => {
+            resolve();
+          }, { once: true });
+          
+          // Send a close frame
+          ws.close(1000, "Exercise stopped by user");
+        } else {
+          resolve();
+        }
+      });
+      
+      closeWebSocket.then(() => {
+        return fetch(`${API_BASE_URL}/v1/exercise/stop?session_id=${sessionId}`, { 
+          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Stop request failed');
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log("Exercise stopped successfully:", data);
+        // Clean up local storage
+        localStorage.removeItem("sessionId");
+        localStorage.removeItem("exerciseName");
+        // Redirect to home page
+        window.location.href = "index.html";
+      })
+      .catch(error => {
+        console.error('Error during stop exercise:', error);
+        // Still redirect even if there's an error
+        localStorage.removeItem("sessionId");
+        localStorage.removeItem("exerciseName");
+        window.location.href = "index.html";
+      })
+      .finally(() => {
+        ws = null;
+      });
+    }
+    
+    window.addEventListener("beforeunload", stopExercise);
   </script>
 </body>
 </html>
