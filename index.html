@@ -233,12 +233,11 @@
         #camera-stream,
         #pose-canvas {
             border-radius: var(--radius);
-            transform: scaleX(-1);
-            /* Mirror for front camera */
+            /* transform: scaleX(-1);
             width: 1080px;
             height: 1920px;
             transition: filter 0.5s ease;
-            aspect-ratio: 9 / 16;
+            aspect-ratio: 9 / 16; */
         }
 
         #camera-stream.blur,
@@ -723,6 +722,19 @@
     <script>
         // Configuration
         const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
+        navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: "environment" },  // Use "user" for front camera
+                width: { ideal: 1080 },
+                height: { ideal: 1920 },
+                aspectRatio: 9 / 16
+            }
+        }).then((stream) => {
+            const video = document.getElementById('camera-stream');
+            video.srcObject = stream;
+        }).catch((error) => {
+            console.error("Camera error:", error);
+        });
         // const API_BASE_URL = 'http://localhost:8000/v1/exercise';
 
         // Global variables
