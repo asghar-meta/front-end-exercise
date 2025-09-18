@@ -10,7 +10,7 @@
             --primary: #4361ee;
             --secondary: #3a0ca3;
             --success: #4cc9f0;
-            --warning: #f72585;
+            --warning: #118076;
             --dark: #212529;
             --light: #f8f9fa;
             --gray: #6c757d;
@@ -27,7 +27,7 @@
         }
 
         body {
-            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            background: linear-gradient(135deg, #1a2a6c, #118076, #fdbb2d);
             background-size: 400% 400%;
             animation: gradientBG 15s ease infinite;
             color: var(--light);
@@ -787,7 +787,7 @@
             errorDiv.style.top = '50%';
             errorDiv.style.left = '50%';
             errorDiv.style.transform = 'translate(-50%, -50%)';
-            errorDiv.style.background = 'rgba(247, 37, 133, 0.9)';
+            errorDiv.style.background = '#282828';
             errorDiv.style.color = 'white';
             errorDiv.style.padding = '20px';
             errorDiv.style.borderRadius = '10px';
@@ -882,7 +882,7 @@
             });
 
             pose.setOptions({
-                modelComplexity: 0,
+                modelComplexity: 1,
                 smoothLandmarks: true,
                 enableSegmentation: false,
                 smoothSegmentation: false,
@@ -1111,7 +1111,7 @@
 
         // Initialize WebSocket connection
         function initializeWebSocket() {
-            const wsUrl = `${API_BASE_URL.replace(/^http/, 'wss')}/ws?session_id=${sessionId}`;
+            const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws?session_id=${sessionId}`;
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
@@ -1251,8 +1251,8 @@
                 window.history.replaceState({}, document.title, window.location.pathname);
                 
                 // Show error message that exercise has ended
-                showError("Exercise has ended. Please provide a new session ID and exercise name to continue.");
-                
+                showError("Exercise has ended.");
+                window.location.href = '/';
                 exerciseStopped = false;
             });
         }
