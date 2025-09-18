@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,9 +37,17 @@
         }
 
         @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
         }
 
         .container {
@@ -84,7 +93,8 @@
             font-size: 1.8rem;
         }
 
-        select, button {
+        select,
+        button {
             width: 100%;
             padding: 15px;
             border-radius: 8px;
@@ -220,15 +230,18 @@
         }
 
         /* Modified video and canvas styling */
-        #camera-stream, #pose-canvas {
+        #camera-stream,
+        #pose-canvas {
             border-radius: var(--radius);
-            transform: scaleX(-1); /* Mirror for front camera */
+            transform: scaleX(-1);
+            /* Mirror for front camera */
             width: 100%;
             height: auto;
             transition: filter 0.5s ease;
         }
 
-        #camera-stream.blur, #pose-canvas.blur {
+        #camera-stream.blur,
+        #pose-canvas.blur {
             filter: blur(8px);
             -webkit-filter: blur(8px);
         }
@@ -247,7 +260,8 @@
             border-radius: var(--radius);
             opacity: 0;
             transition: opacity 0.5s ease;
-            pointer-events: none; /* Allow clicks to pass through */
+            pointer-events: none;
+            /* Allow clicks to pass through */
         }
 
         .person-detection-overlay.active {
@@ -289,8 +303,15 @@
         }
 
         @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
         }
 
         .feedback-panel {
@@ -316,31 +337,45 @@
 
         /* Animations */
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         @keyframes slideUp {
-            from { 
+            from {
                 opacity: 0;
                 transform: translateY(30px);
             }
-            to { 
+
+            to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
 
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(76, 201, 240, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(76, 201, 240, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(76, 201, 240, 0); }
+            0% {
+                box-shadow: 0 0 0 0 rgba(76, 201, 240, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(76, 201, 240, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(76, 201, 240, 0);
+            }
         }
 
         /* Mobile Info Panel Styles */
         .mobile-info-panel {
             display: none;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0, 0, 0, 0.7);
             border-radius: 10px;
             padding: 15px;
             margin: 0 15px;
@@ -366,31 +401,34 @@
 
         /* Mobile styles */
         @media (max-width: 768px) {
-            html, body {
+
+            html,
+            body {
                 height: 100%;
                 margin: 0;
                 padding: 0;
                 overflow: hidden;
             }
-            
+
             .container {
                 padding: 0;
                 height: 100vh;
                 max-width: 100%;
                 width: 100%;
             }
-            
+
             #exercise-view {
                 height: 100vh;
-                display: none; /* Keep hidden by default */
+                display: none;
+                /* Keep hidden by default */
                 flex-direction: column;
             }
-            
+
             /* Show exercise view when active */
             #exercise-view.active {
                 display: flex;
             }
-            
+
             /* Fixed header positioning - only visible when exercise is active */
             .exercise-header {
                 position: absolute;
@@ -398,25 +436,25 @@
                 left: 0;
                 right: 0;
                 z-index: 10;
-                background: rgba(0,0,0,0.5);
+                background: rgba(0, 0, 0, 0.5);
                 padding: 10px;
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 height: auto;
             }
-            
+
             .exercise-header h1 {
                 font-size: 1.5rem;
                 margin: 0;
                 text-align: center;
             }
-            
+
             /* Hide stop button in header on mobile */
             .exercise-header #stop-btn {
                 display: none;
             }
-            
+
             .exercise-container {
                 position: relative;
                 height: 100vh;
@@ -424,7 +462,7 @@
                 display: flex;
                 flex-direction: column;
             }
-            
+
             .video-feed {
                 position: absolute;
                 top: 0;
@@ -434,25 +472,27 @@
                 z-index: 1;
                 margin: 0;
             }
-            
+
             .video-placeholder {
                 width: 100%;
                 height: 100%;
                 border-radius: 0;
             }
-            
-            #camera-stream, #pose-canvas {
+
+            #camera-stream,
+            #pose-canvas {
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
                 border-radius: 0;
             }
-            
+
             /* Hide desktop panels on mobile */
-            .stats-panel, .feedback-panel {
+            .stats-panel,
+            .feedback-panel {
                 display: none;
             }
-            
+
             /* Show mobile info panel */
             .mobile-info-panel {
                 display: none;
@@ -462,28 +502,28 @@
                 right: 0;
                 z-index: 2;
                 margin: 0 15px;
-                background: rgba(0,0,0,0.7);
+                background: rgba(0, 0, 0, 0.7);
                 border-radius: 10px;
                 padding: 15px;
             }
-            
+
             .info-row {
                 display: flex;
                 justify-content: space-between;
                 margin-bottom: 8px;
                 font-size: 1rem;
             }
-            
+
             .info-row:last-child {
                 margin-bottom: 0;
             }
-            
+
             .info-label {
                 font-weight: bold;
                 color: #4cc9f0;
                 width: 80px;
             }
-            
+
             /* Fixed stop button at bottom - only visible when exercise is active */
             #stop-btn {
                 position: fixed;
@@ -494,28 +534,30 @@
                 max-width: 90%;
                 width: 90%;
                 margin: 0;
-                display: none; /* Keep hidden by default */
+                display: none;
+                /* Keep hidden by default */
             }
-            
+
             /* Show stop button when exercise is active */
             #exercise-view.active #stop-btn {
                 display: block;
             }
-            
-            .loader, .camera-permission {
+
+            .loader,
+            .camera-permission {
                 position: absolute;
                 top: 0;
                 left: 0;
                 width: 100%;
                 height: 100%;
                 z-index: 5;
-                background: rgba(0,0,0,0.7);
+                background: rgba(0, 0, 0, 0.7);
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
                 align-items: center;
             }
-            
+
             .person-detection-overlay {
                 position: absolute;
                 top: 0;
@@ -524,22 +566,22 @@
                 height: 100%;
                 z-index: 3;
             }
-            
+
             .overlay-content {
-                background: rgba(0,0,0,0.8);
+                background: rgba(0, 0, 0, 0.8);
                 padding: 20px;
                 border-radius: 10px;
                 max-width: 90%;
             }
-            
+
             .overlay-content i {
                 font-size: 3rem;
             }
-            
+
             .overlay-content h3 {
                 font-size: 1.5rem;
             }
-            
+
             .overlay-content p {
                 font-size: 1rem;
             }
@@ -563,8 +605,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         /* Camera Permission Prompt */
@@ -582,12 +629,13 @@
             margin-bottom: 15px;
             color: var(--warning);
         }
+
         #camera-stream {
             display: none;
         }
-
     </style>
 </head>
+
 <body>
     <div class="container">
         <!-- Exercise View -->
@@ -596,7 +644,7 @@
                 <h1 id="exercise-name">Exercise</h1>
                 <button id="stop-btn">Stop Exercise</button>
             </header>
-            
+
             <div class="loader">
                 <div class="loader-spinner"></div>
                 <p>Initializing camera and pose detection...</p>
@@ -607,20 +655,20 @@
                 <h3>Camera Access Required</h3>
                 <p>Please allow camera access to use the posture detection feature</p>
             </div>
-            
+
             <main class="exercise-container">
                 <div class="stats-panel">
                     <div class="stat-box">
                         <h3>REPS</h3>
                         <div id="rep-counter" class="counter">0</div>
                     </div>
-                    
+
                     <div class="stat-box">
                         <h3>FORM</h3>
                         <div id="form-status" class="status">OK</div>
                     </div>
                 </div>
-                
+
                 <div class="mobile-info-panel">
                     <div class="info-row">
                         <span class="info-label">Exercise:</span>
@@ -653,7 +701,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="feedback-panel">
                     <h3>FEEDBACK</h3>
                     <div id="feedback-text" class="feedback-text">No feedback yet</div>
@@ -672,7 +720,7 @@
         // Configuration
         const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
         // const API_BASE_URL = 'http://localhost:8000/v1/exercise';
-        
+
         // Global variables
         let ws = null;
         let pose = null;
@@ -683,7 +731,7 @@
         let missingFrames = 0;
         const MISSING_THRESHOLD = 0;
         let exerciseActive = false; // Flag to track if exercise is active
-        
+
         // Camera jerk detection variables
         let lastKeypoints = null;
         let lastFrameTimestamp = null;
@@ -691,11 +739,11 @@
         let isCameraJerk = false;
         let jerkRecoveryFrames = 0;
         const JERK_RECOVERY_COUNT = 30;
-        
+
         // Rep cooldown to prevent multiple counts
         let lastRepTime = 0;
         const repCooldownMs = 500; // 1 second cooldown after a rep
-        
+
         // Whole body detection variables
         const bodyVisibilityThreshold = 0.7; // 70% of key points must be visible
         const keyPointVisibilityThreshold = 0.5; // Each key point must be at least 50% visible
@@ -718,7 +766,7 @@
         // Check if whole body is visible
         function isWholeBodyVisible(landmarks) {
             if (!landmarks || landmarks.length === 0) return false;
-            
+
             // Key points for whole body detection (head, shoulders, elbows, wrists, hips, knees, ankles)
             const keyPointIndices = [
                 0,   // nose
@@ -735,10 +783,10 @@
                 27,  // left ankle
                 28   // right ankle
             ];
-            
+
             let visiblePoints = 0;
             const totalPoints = keyPointIndices.length;
-            
+
             for (const index of keyPointIndices) {
                 if (index < landmarks.length) {
                     const landmark = landmarks[index];
@@ -747,10 +795,10 @@
                     }
                 }
             }
-            
+
             // Calculate visibility percentage
             const visibilityPercentage = visiblePoints / totalPoints;
-            
+
             return visibilityPercentage >= bodyVisibilityThreshold;
         }
 
@@ -760,14 +808,14 @@
             const urlParams = new URLSearchParams(window.location.search);
             const urlSessionId = urlParams.get('session_id');
             const urlExerciseName = urlParams.get('exercise');
-            
+
             // Check if we have the required parameters in the URL
             if (urlSessionId && urlExerciseName) {
                 // Use the parameters from the URL
                 sessionId = urlSessionId;
                 exerciseName = urlExerciseName;
                 exerciseActive = true;
-                
+
                 // Show exercise view and initialize
                 showExerciseView();
                 initializeExercise();
@@ -775,7 +823,7 @@
                 // If no URL params, show an error
                 showError("No session information found. Please provide a valid session ID and exercise name in the URL.");
             }
-            
+
             // Set up event listener for stop button
             stopBtn.addEventListener('click', stopExercise);
         });
@@ -794,17 +842,17 @@
             errorDiv.style.textAlign = 'center';
             errorDiv.style.zIndex = '1000';
             errorDiv.innerHTML = `<h3>Error</h3><p>${message}</p>`;
-            
+
             document.body.appendChild(errorDiv);
-            
+
             // Add a close button
             const closeButton = document.createElement('button');
             closeButton.textContent = 'Close';
             closeButton.style.marginTop = '10px';
-            closeButton.onclick = function() {
+            closeButton.onclick = function () {
                 document.body.removeChild(errorDiv);
             };
-            
+
             errorDiv.appendChild(closeButton);
         }
 
@@ -815,18 +863,18 @@
             formStatus.textContent = "OK";
             formStatus.className = "status good";
             feedbackText.textContent = "No feedback yet";
-            
+
             // Reset mobile UI elements
             const mobileRepCounter = document.getElementById('rep-counter-mobile');
             const mobileFormStatus = document.getElementById('form-status-mobile');
             const mobileFeedbackText = document.getElementById('feedback-text-mobile');
             const mobileExerciseName = document.getElementById('exercise-name-mobile');
-            
+
             if (mobileRepCounter) mobileRepCounter.textContent = "0";
             if (mobileFormStatus) mobileFormStatus.textContent = "OK";
             if (mobileFeedbackText) mobileFeedbackText.textContent = "No feedback yet";
             if (mobileExerciseName) mobileExerciseName.textContent = exerciseName || "Exercise";
-            
+
             // Reset state variables
             personDetected = true;
             missingFrames = 0;
@@ -836,7 +884,7 @@
             isCameraJerk = false;
             jerkRecoveryFrames = 0;
             lastRepTime = 0;
-            
+
             // Reset overlay and blur
             personDetectionOverlay.classList.remove('active');
             cameraStream.classList.remove('blur');
@@ -855,15 +903,15 @@
             // Set up canvas dimensions
             poseCanvas.width = 640;
             poseCanvas.height = 480;
-            
+
             // Initialize MediaPipe Pose only if not already initialized
             if (!pose) {
                 initializeMediaPipe();
             }
-            
+
             // Initialize WebSocket connection
             initializeWebSocket();
-            
+
             // Show mobile info panel on mobile devices
             if (window.innerWidth <= 768) {
                 const mobileInfoPanel = document.querySelector('.mobile-info-panel');
@@ -899,7 +947,7 @@
                         try {
                             // Only process frames if exercise is active
                             if (exerciseActive) {
-                                await pose.send({image: cameraStream});
+                                await pose.send({ image: cameraStream });
                             }
                         } catch (error) {
                             console.error('Error processing frame:', error);
@@ -926,35 +974,35 @@
         // Detect camera jerk
         function detectCameraJerk(currentKeypoints, previousKeypoints) {
             if (!previousKeypoints) return false;
-            
+
             // Calculate movement for each keypoint
             const movements = [];
             let totalMovement = 0;
             let validPoints = 0;
-            
+
             for (let i = 0; i < currentKeypoints.length; i++) {
                 if (currentKeypoints[i][3] > 0.5 && previousKeypoints[i][3] > 0.5) {
                     const dx = currentKeypoints[i][0] - previousKeypoints[i][0];
                     const dy = currentKeypoints[i][1] - previousKeypoints[i][1];
-                    const distance = Math.sqrt(dx*dx + dy*dy);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
                     movements.push(distance);
                     totalMovement += distance;
                     validPoints++;
                 }
             }
-            
+
             if (validPoints === 0) return false;
-            
+
             // Calculate average movement and standard deviation
             const avgMovement = totalMovement / validPoints;
-            
+
             // Calculate standard deviation
             let variance = 0;
             for (const movement of movements) {
                 variance += Math.pow(movement - avgMovement, 2);
             }
             const stdDev = Math.sqrt(variance / movements.length);
-            
+
             // Camera jerk detection:
             // 1. High average movement across all points
             // 2. Low standard deviation (all points moving similarly)
@@ -965,7 +1013,7 @@
         // Process pose results
         function onPoseResults(results) {
             if (loader.style.display !== 'none') {
-                loader.style.display = 'none'; 
+                loader.style.display = 'none';
                 cameraPermission.style.display = 'none';
             }
             let canvasCtx = null;
@@ -1000,7 +1048,7 @@
 
                     // Check if whole body is visible
                     const bodyVisible = isWholeBodyVisible(results.poseLandmarks);
-                    
+
                     // Update whole body detection state
                     if (bodyVisible !== wholeBodyDetected) {
                         wholeBodyDetected = bodyVisible;
@@ -1009,13 +1057,13 @@
 
                     // Check for camera jerk
                     const detectedJerk = detectCameraJerk(keypoints, lastKeypoints);
-                    
+
                     if (detectedJerk && !isCameraJerk) {
                         isCameraJerk = true;
                         jerkRecoveryFrames = JERK_RECOVERY_COUNT;
                         console.log("Camera jerk detected - ignoring frames");
                     }
-                    
+
                     // Handle jerk recovery
                     if (isCameraJerk) {
                         jerkRecoveryFrames--;
@@ -1024,10 +1072,10 @@
                             console.log("Camera jerk recovery complete");
                         }
                     }
-                    
+
                     // Check if we're in rep cooldown period
                     const inRepCooldown = (currentTimestamp - lastRepTime) < repCooldownMs;
-                    
+
                     // Send keypoints if whole body is visible, not in jerk recovery mode, and not in rep cooldown
                     if (wholeBodyDetected && !isCameraJerk && !inRepCooldown) {
                         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1040,7 +1088,7 @@
                     } else {
                         console.log(`Ignoring frame: ${!wholeBodyDetected ? 'whole body not visible' : (isCameraJerk ? 'camera jerk' : 'rep cooldown')}`);
                     }
-                    
+
                     lastKeypoints = keypoints;
                     lastFrameTimestamp = currentTimestamp;
 
@@ -1094,16 +1142,16 @@
             formStatus.textContent = "NO PERSON";
             formStatus.className = "status bad";
             feedbackText.textContent = "No person detected";
-            
+
             // Update mobile UI
             const mobileFormStatus = document.getElementById('form-status-mobile');
             const mobileFeedbackText = document.getElementById('feedback-text-mobile');
-            
+
             if (mobileFormStatus) {
                 mobileFormStatus.textContent = "NO PERSON";
                 mobileFormStatus.className = "bad";
             }
-            
+
             if (mobileFeedbackText) {
                 mobileFeedbackText.textContent = "No person detected";
             }
@@ -1123,22 +1171,22 @@
                 try {
                     const data = JSON.parse(event.data);
                     console.log('WebSocket data:', data);
-                    
+
                     // Update rep cooldown if reps increased
                     if (data.reps !== undefined) {
                         const currentReps = data.reps;
                         const previousReps = parseInt(repCounter.textContent) || 0;
-                        
+
                         if (currentReps > previousReps) {
                             lastRepTime = Date.now();
                             console.log(`Rep counted! Cooldown started. New rep count: ${currentReps}`);
-                            
+
                             // Add animation effect for rep counter
                             repCounter.classList.add('pulse');
                             setTimeout(() => repCounter.classList.remove('pulse'), 1000);
                         }
                     }
-                    
+
                     updateUI(data);
                 } catch (error) {
                     console.error("WebSocket parse error:", error);
@@ -1170,7 +1218,7 @@
                 const mobileRepCounter = document.getElementById('rep-counter-mobile');
                 if (mobileRepCounter) {
                     mobileRepCounter.textContent = data.reps;
-                    
+
                     // Add animation effect for mobile rep counter
                     mobileRepCounter.classList.add('pulse');
                     setTimeout(() => mobileRepCounter.classList.remove('pulse'), 1000);
@@ -1181,7 +1229,7 @@
                     const statusText = data.form_ok ? "OK" : "FIX";
                     formStatus.textContent = statusText;
                     formStatus.className = "status " + (data.form_ok ? "good" : "bad");
-                    
+
                     const mobileFormStatus = document.getElementById('form-status-mobile');
                     if (mobileFormStatus) {
                         mobileFormStatus.textContent = statusText;
@@ -1192,18 +1240,18 @@
             if (data.feedback !== undefined) {
                 if (personDetected) {
                     feedbackText.textContent = data.feedback || "No feedback yet";
-                    
+
                     // Add animation for feedback changes
                     feedbackText.style.opacity = '0';
                     setTimeout(() => {
                         feedbackText.style.transition = 'opacity 0.5s ease';
                         feedbackText.style.opacity = '1';
                     }, 100);
-                    
+
                     const mobileFeedbackText = document.getElementById('feedback-text-mobile');
                     if (mobileFeedbackText) {
                         mobileFeedbackText.textContent = data.feedback || "No feedback yet";
-                        
+
                         // Add animation for feedback changes
                         mobileFeedbackText.style.opacity = '0';
                         setTimeout(() => {
@@ -1218,10 +1266,11 @@
         // Stop exercise function
         let exerciseStopped = false;
         function stopExercise() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ event: "stop_exercise" }))
             if (exerciseStopped) return;
             exerciseStopped = true;
             exerciseActive = false; // Set exercise as inactive
-            
+
             // Close WebSocket connection
             if (ws) {
                 if (ws.readyState === WebSocket.OPEN) {
@@ -1229,33 +1278,34 @@
                 }
                 ws = null;
             }
-            
+
             // Clear overlay and blur
             personDetectionOverlay.classList.remove('active');
             cameraStream.classList.remove('blur');
             poseCanvas.classList.remove('blur');
-            
+
             if (camera) {
                 camera.stop();
                 camera = null;
             }
 
             // Call API to stop exercise
-            fetch(`${API_BASE_URL}/stop?session_id=${sessionId}`, { 
+            fetch(`${API_BASE_URL}/stop?session_id=${sessionId}`, {
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' }
             })
-            .catch(error => console.error('Error stopping exercise:', error))
-            .finally(() => {
-                // Redirect to a clean URL without parameters
-                window.history.replaceState({}, document.title, window.location.pathname);
-                
-                // Show error message that exercise has ended
-                showError("Exercise has ended.");
-                window.location.href = '/';
-                exerciseStopped = false;
-            });
+                .catch(error => console.error('Error stopping exercise:', error))
+                .finally(() => {
+                    // Redirect to a clean URL without parameters
+                    window.history.replaceState({}, document.title, window.location.pathname);
+
+                    // Show error message that exercise has ended
+                    showError("Exercise has ended.");
+                    window.location.href = '/';
+                    exerciseStopped = false;
+                });
         }
     </script>
 </body>
+
 </html>
