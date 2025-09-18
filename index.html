@@ -482,9 +482,13 @@
             #camera-stream,
             #pose-canvas {
                 width: 100%;
+                max-width: 100%;
                 height: 100%;
+                /* keeps aspect ratio */
                 object-fit: cover;
+                /* fills while cropping edges a bit */
                 border-radius: 0;
+                display: block;
             }
 
             /* Hide desktop panels on mobile */
@@ -641,7 +645,6 @@
         <!-- Exercise View -->
         <div id="exercise-view">
             <header class="exercise-header">
-                <h1 id="exercise-name">Exercise</h1>
                 <button id="stop-btn">Stop Exercise</button>
             </header>
 
@@ -752,7 +755,7 @@
         // DOM Elements
         const exerciseView = document.getElementById('exercise-view');
         const stopBtn = document.getElementById('stop-btn');
-        const exerciseNameEl = document.getElementById('exercise-name');
+        // const exerciseNameEl = document.getElementById('exercise-name');
         const repCounter = document.getElementById('rep-counter');
         const formStatus = document.getElementById('form-status');
         const feedbackText = document.getElementById('feedback-text');
@@ -841,6 +844,7 @@
             errorDiv.style.borderRadius = '10px';
             errorDiv.style.textAlign = 'center';
             errorDiv.style.zIndex = '1000';
+            errorDiv.style.width = '80%';
             errorDiv.innerHTML = `<h3>Error</h3><p>${message}</p>`;
 
             document.body.appendChild(errorDiv);
@@ -848,8 +852,10 @@
             // Add a close button
             const closeButton = document.createElement('button');
             closeButton.textContent = 'Close';
-            closeButton.style.marginTop = '10px';
+            closeButton.style.marginTop = '20px';
+            closeButton.style.backgroundColor = '#118076';
             closeButton.onclick = function () {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ event: "stop_exercise" }))
                 document.body.removeChild(errorDiv);
             };
 
@@ -895,7 +901,7 @@
         function showExerciseView() {
             exerciseView.style.display = 'flex';
             exerciseView.classList.add('active');
-            exerciseNameEl.textContent = exerciseName || "Exercise";
+            // exerciseNameEl.textContent = exerciseName || "Exercise";
         }
 
         // Initialize exercise monitoring
@@ -1207,7 +1213,7 @@
         // Update UI with exercise data
         function updateUI(data) {
             if (data.exercise) {
-                exerciseNameEl.textContent = data.exercise;
+                // exerciseNameEl.textContent = data.exercise;
                 const mobileExerciseName = document.getElementById('exercise-name-mobile');
                 if (mobileExerciseName) {
                     mobileExerciseName.textContent = data.exercise;
