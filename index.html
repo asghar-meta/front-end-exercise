@@ -130,7 +130,7 @@
             background: var(--warning);
             max-width: 200px;
             margin: 20px auto;
-            display: block;
+            display: none;
         }
 
         #stop-btn:hover {
@@ -364,16 +364,6 @@
             width: 80px;
         }
 
-        /* Base styles for exercise view */
-        #exercise-view {
-            display: none;
-        }
-
-        /* Base styles for stop button */
-        #stop-btn {
-            display: none;
-        }
-
         /* Mobile styles */
         @media (max-width: 768px) {
             html, body {
@@ -600,31 +590,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Selection View -->
-        <div id="selection-view">
-            <header>
-                <h1>Exercise Posture Detector</h1>
-                <p>Select an exercise to begin tracking your form and reps</p>
-                <br>
-                <p>Make sure your camera is positioned for a clear side view of the exercise</p>
-            </header>
-            
-            <main class="selection-container">
-                <div class="card">
-                    <h2>Choose Exercise</h2>
-                    <select id="exercise-select">
-                        <option value="">-- Select Exercise --</option>
-                        <option value="barbell biceps curl">barbell biceps curl</option>
-                        <option value="squat">squat</option>
-                        <option value="push-up">push ups</option>
-                        <option value="plank">plank</option>
-                        <option value="deadlift">deadlift</option>
-                    </select>
-                    <button id="start-btn" disabled>Start Exercise</button>
-                </div>
-            </main>
-        </div>
-
         <!-- Exercise View -->
         <div id="exercise-view">
             <header class="exercise-header">
@@ -655,7 +620,7 @@
                         <div id="form-status" class="status">OK</div>
                     </div>
                 </div>
-                <!-- Add this new panel inside the exercise-container, after the stats-panel -->
+                
                 <div class="mobile-info-panel">
                     <div class="info-row">
                         <span class="info-label">Exercise:</span>
@@ -705,8 +670,8 @@
 
     <script>
         // Configuration
-        // const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
-        const API_BASE_URL = 'http://localhost:8000/v1/exercise';
+        const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
+        // const API_BASE_URL = 'http://localhost:8000/v1/exercise';
         
         // Global variables
         let ws = null;
@@ -737,10 +702,7 @@
         let wholeBodyDetected = false;
 
         // DOM Elements
-        const selectionView = document.getElementById('selection-view');
         const exerciseView = document.getElementById('exercise-view');
-        const exerciseSelect = document.getElementById('exercise-select');
-        const startBtn = document.getElementById('start-btn');
         const stopBtn = document.getElementById('stop-btn');
         const exerciseNameEl = document.getElementById('exercise-name');
         const repCounter = document.getElementById('rep-counter');
@@ -794,73 +756,56 @@
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', () => {
-            // Check if we're returning from an exercise session
-            const savedSessionId = localStorage.getItem("sessionId");
-            const savedExerciseName = localStorage.getItem("exerciseName");
+            // Parse URL parameters to get session ID and exercise name
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlSessionId = urlParams.get('session_id');
+            const urlExerciseName = urlParams.get('exercise');
             
-            if (savedSessionId && savedExerciseName) {
-                // We have an active session, go directly to exercise view
-                sessionId = savedSessionId;
-                exerciseName = savedExerciseName;
+            // Check if we have the required parameters in the URL
+            if (urlSessionId && urlExerciseName) {
+                // Use the parameters from the URL
+                sessionId = urlSessionId;
+                exerciseName = urlExerciseName;
+                exerciseActive = true;
+                
+                // Show exercise view and initialize
                 showExerciseView();
                 initializeExercise();
+            } else {
+                // If no URL params, show an error
+                showError("No session information found. Please provide a valid session ID and exercise name in the URL.");
             }
             
-            // Set up event listeners for selection view
-            exerciseSelect.addEventListener('change', function() {
-                startBtn.disabled = !this.value;
-            });
-
-            startBtn.addEventListener('click', startExercise);
+            // Set up event listener for stop button
             stopBtn.addEventListener('click', stopExercise);
         });
 
-        // Start exercise function
-        function startExercise() {
-            const exercise = exerciseSelect.value;
-            if (!exercise) return;
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.top = '50%';
+            errorDiv.style.left = '50%';
+            errorDiv.style.transform = 'translate(-50%, -50%)';
+            errorDiv.style.background = 'rgba(247, 37, 133, 0.9)';
+            errorDiv.style.color = 'white';
+            errorDiv.style.padding = '20px';
+            errorDiv.style.borderRadius = '10px';
+            errorDiv.style.textAlign = 'center';
+            errorDiv.style.zIndex = '1000';
+            errorDiv.innerHTML = `<h3>Error</h3><p>${message}</p>`;
             
-            loader.style.display = 'block';
+            document.body.appendChild(errorDiv);
             
-            fetch(`${API_BASE_URL}/start`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ exercise })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'started') {
-                    sessionId = data.session_id;
-                    exerciseName = exercise;
-                    exerciseActive = true; // Set exercise as active
-                    
-                    localStorage.setItem("sessionId", sessionId);
-                    localStorage.setItem("exerciseName", exerciseName);
-                    
-                    // Reset UI state for new exercise
-                    resetExerciseState();
-                    camera = new Camera(cameraStream, {
-                        onFrame: async () => {
-                        await pose.send({ image: cameraStream });
-                        },
-                        width: 640,
-                        height: 480
-                    });
-
-                    // start webcam
-                    camera.start();
-                    showExerciseView();
-                    initializeExercise();
-                } else {
-                    alert("Failed to start exercise: " + (data.message || "Unknown error"));
-                    loader.style.display = 'none';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to start exercise');
-                loader.style.display = 'none';
-            });
+            // Add a close button
+            const closeButton = document.createElement('button');
+            closeButton.textContent = 'Close';
+            closeButton.style.marginTop = '10px';
+            closeButton.onclick = function() {
+                document.body.removeChild(errorDiv);
+            };
+            
+            errorDiv.appendChild(closeButton);
         }
 
         // Reset exercise state
@@ -870,6 +815,17 @@
             formStatus.textContent = "OK";
             formStatus.className = "status good";
             feedbackText.textContent = "No feedback yet";
+            
+            // Reset mobile UI elements
+            const mobileRepCounter = document.getElementById('rep-counter-mobile');
+            const mobileFormStatus = document.getElementById('form-status-mobile');
+            const mobileFeedbackText = document.getElementById('feedback-text-mobile');
+            const mobileExerciseName = document.getElementById('exercise-name-mobile');
+            
+            if (mobileRepCounter) mobileRepCounter.textContent = "0";
+            if (mobileFormStatus) mobileFormStatus.textContent = "OK";
+            if (mobileFeedbackText) mobileFeedbackText.textContent = "No feedback yet";
+            if (mobileExerciseName) mobileExerciseName.textContent = exerciseName || "Exercise";
             
             // Reset state variables
             personDetected = true;
@@ -889,18 +845,9 @@
 
         // Show exercise view with animation
         function showExerciseView() {
-            selectionView.style.display = 'none';
-            // exerciseView.style.display = 'block';
-            exerciseView.style.display = 'flex'; // Use flex for mobile layout
-            exerciseView.classList.add('active')
-            exerciseNameEl.textContent = exerciseName;
-        }
-
-        // Show selection view with animation
-        function showSelectionView() {
-            exerciseView.style.display = 'none';
-            selectionView.style.display = 'block';
-             exerciseView.classList.remove('active')
+            exerciseView.style.display = 'flex';
+            exerciseView.classList.add('active');
+            exerciseNameEl.textContent = exerciseName || "Exercise";
         }
 
         // Initialize exercise monitoring
@@ -916,8 +863,13 @@
             
             // Initialize WebSocket connection
             initializeWebSocket();
-             if (window.innerWidth <= 768) {
-                document.querySelector('.mobile-info-panel').style.display = 'block';
+            
+            // Show mobile info panel on mobile devices
+            if (window.innerWidth <= 768) {
+                const mobileInfoPanel = document.querySelector('.mobile-info-panel');
+                if (mobileInfoPanel) {
+                    mobileInfoPanel.style.display = 'block';
+                }
             }
         }
 
@@ -1126,17 +1078,14 @@
 
         // Update whole body detection UI
         function updateWholeBodyDetectionUI(isVisible) {
-            console.log('Updating whole body detection UI. isVisible:', isVisible);
             if (isVisible) {
                 personDetectionOverlay.classList.remove('active');
                 cameraStream.classList.remove('blur');
                 poseCanvas.classList.remove('blur');
-                console.log('Removed overlay and blur');
             } else {
                 personDetectionOverlay.classList.add('active');
                 cameraStream.classList.add('blur');
                 poseCanvas.classList.add('blur');
-                console.log('Added overlay and blur');
             }
         }
 
@@ -1145,14 +1094,30 @@
             formStatus.textContent = "NO PERSON";
             formStatus.className = "status bad";
             feedbackText.textContent = "No person detected";
+            
+            // Update mobile UI
+            const mobileFormStatus = document.getElementById('form-status-mobile');
+            const mobileFeedbackText = document.getElementById('feedback-text-mobile');
+            
+            if (mobileFormStatus) {
+                mobileFormStatus.textContent = "NO PERSON";
+                mobileFormStatus.className = "bad";
+            }
+            
+            if (mobileFeedbackText) {
+                mobileFeedbackText.textContent = "No person detected";
+            }
         }
 
         // Initialize WebSocket connection
         function initializeWebSocket() {
-            const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws?session_id=${sessionId}&exercise=${encodeURIComponent(exerciseName)}`;
+            const wsUrl = `${API_BASE_URL.replace(/^http/, 'wss')}/ws?session_id=${sessionId}`;
             ws = new WebSocket(wsUrl);
 
-            ws.onopen = () => console.log("WebSocket connected");
+            ws.onopen = () => {
+                console.log("WebSocket connected");
+                resetExerciseState();
+            };
 
             ws.onmessage = (event) => {
                 try {
@@ -1195,14 +1160,33 @@
         function updateUI(data) {
             if (data.exercise) {
                 exerciseNameEl.textContent = data.exercise;
+                const mobileExerciseName = document.getElementById('exercise-name-mobile');
+                if (mobileExerciseName) {
+                    mobileExerciseName.textContent = data.exercise;
+                }
             }
             if (data.reps !== undefined) {
                 repCounter.textContent = data.reps;
+                const mobileRepCounter = document.getElementById('rep-counter-mobile');
+                if (mobileRepCounter) {
+                    mobileRepCounter.textContent = data.reps;
+                    
+                    // Add animation effect for mobile rep counter
+                    mobileRepCounter.classList.add('pulse');
+                    setTimeout(() => mobileRepCounter.classList.remove('pulse'), 1000);
+                }
             }
             if (data.form_ok !== undefined) {
                 if (personDetected) {
-                    formStatus.textContent = data.form_ok ? "OK" : "FIX";
+                    const statusText = data.form_ok ? "OK" : "FIX";
+                    formStatus.textContent = statusText;
                     formStatus.className = "status " + (data.form_ok ? "good" : "bad");
+                    
+                    const mobileFormStatus = document.getElementById('form-status-mobile');
+                    if (mobileFormStatus) {
+                        mobileFormStatus.textContent = statusText;
+                        mobileFormStatus.className = data.form_ok ? "good" : "bad";
+                    }
                 }
             }
             if (data.feedback !== undefined) {
@@ -1215,6 +1199,18 @@
                         feedbackText.style.transition = 'opacity 0.5s ease';
                         feedbackText.style.opacity = '1';
                     }, 100);
+                    
+                    const mobileFeedbackText = document.getElementById('feedback-text-mobile');
+                    if (mobileFeedbackText) {
+                        mobileFeedbackText.textContent = data.feedback || "No feedback yet";
+                        
+                        // Add animation for feedback changes
+                        mobileFeedbackText.style.opacity = '0';
+                        setTimeout(() => {
+                            mobileFeedbackText.style.transition = 'opacity 0.5s ease';
+                            mobileFeedbackText.style.opacity = '1';
+                        }, 100);
+                    }
                 }
             }
         }
@@ -1243,7 +1239,7 @@
                 camera.stop();
                 camera = null;
             }
-    
+
             // Call API to stop exercise
             fetch(`${API_BASE_URL}/stop?session_id=${sessionId}`, { 
                 method: "POST",
@@ -1251,17 +1247,15 @@
             })
             .catch(error => console.error('Error stopping exercise:', error))
             .finally(() => {
-                localStorage.removeItem("sessionId");
-                localStorage.removeItem("exerciseName");
-                showSelectionView();
+                // Redirect to a clean URL without parameters
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Show error message that exercise has ended
+                showError("Exercise has ended. Please provide a new session ID and exercise name to continue.");
+                
                 exerciseStopped = false;
             });
         }
-        window.addEventListener("beforeunload", () => {
-            if (sessionId && exerciseActive) {
-                stopExercise();
-            }
-        });
     </script>
 </body>
 </html>
