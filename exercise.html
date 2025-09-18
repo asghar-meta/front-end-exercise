@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Exercise Monitoring</title>
   <link rel="stylesheet" href="/static/style.css">
+
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 </head>
@@ -31,12 +33,8 @@
       
       <div class="video-feed">
         <div class="video-placeholder" style="position: relative; display:inline-block;">
-          <video id="camera-stream" autoplay playsinline width="640" height="480" style="display:none;"></video>
-          
-          <canvas id="overlay-canvas" width="640" height="480" 
-                  style="border:2px solid #444; border-radius:8px;"></canvas>
-          
-          <canvas id="capture-canvas" width="640" height="480" style="display:none;"></canvas>
+          <video id="camera-stream" autoplay playsinline width="640" height="480" style="border:2px solid #444; border-radius:8px;"></video>
+          <canvas id="pose-canvas" width="640" height="480" style="position: absolute; top: 0; left: 0; border-radius:8px;"></canvas>
         </div>
       </div>
       
@@ -46,21 +44,32 @@
       </div>
     </main>
   </div>
+
   <script>
-    // Fixed API URL - corrected the typo
-    const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com';
-    // const API_BASE_URL = 'http://localhost:8000';
-    
+    // const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com';
+    const API_BASE_URL = 'http://localhost:8000';
     let ws = null;
-    let reconnectTimeout = null;
-    let lastFrameTime = 0;
-    const FRAME_INTERVAL = 50; // 20 FPS (50ms per frame)
-    
+    let pose = null;
+    let camera = null;
     const sessionId = localStorage.getItem("sessionId");
     const exerciseName = localStorage.getItem("exerciseName");
+
+    let personDetected = true;
+    let missingFrames = 0;
+    const MISSING_THRESHOLD = 0;
     
-    console.log('Session ID:', sessionId);
+    // Camera jerk detection variables
+    let lastKeypoints = null;
+    let lastFrameTimestamp = null;
+    let cameraJerkThreshold = 0.2;
+    let isCameraJerk = false;
+    let jerkRecoveryFrames = 0;
+    const JERK_RECOVERY_COUNT = 30;
     
+    // Rep cooldown to prevent multiple counts
+    let lastRepTime = 0;
+    const repCooldownMs = 500; // 1 second cooldown after a rep
+
     document.addEventListener("DOMContentLoaded", () => {
       if (!sessionId) {
         alert("No active session. Redirecting...");
@@ -68,222 +77,252 @@
         return;
       }
       
-      document.getElementById("exercise-name").textContent = exerciseName || "Exercise";
+      document.getElementById("exercise-name").textContent = exerciseName;
       
-      initializeMediapipe();
+      initializeMediaPipe();
       initializeWebSocket();
       setupEventListeners();
     });
-    
-    function initializeMediapipe() {
-      const video = document.getElementById("camera-stream");
-      const overlay = document.getElementById("overlay-canvas");
-      const ctx = overlay.getContext("2d");
-      
-      const pose = new Pose({
+
+    function initializeMediaPipe() {
+      const videoElement = document.getElementById('camera-stream');
+      const canvasElement = document.getElementById('pose-canvas');
+      const canvasCtx = canvasElement.getContext('2d');
+
+      pose = new Pose({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
       });
-      
-      // Optimized MediaPipe settings
+
       pose.setOptions({
-        modelComplexity: 0, // Fastest mode
+        modelComplexity: 0,
         smoothLandmarks: true,
         enableSegmentation: false,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
+        smoothSegmentation: false,
+        minDetectionConfidence: 0.9,
+        minTrackingConfidence: 0.9
       });
-      
-      pose.onResults(results => {
-        ctx.clearRect(0, 0, overlay.width, overlay.height);
-        
-        if (results.image) {
-          ctx.drawImage(results.image, 0, 0, overlay.width, overlay.height);
-        }
-        
-        if (results.poseLandmarks) {
-          drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS,
-                        {color: "lime", lineWidth: 3});
-          drawLandmarks(ctx, results.poseLandmarks,
-                        {color: "red", radius: 4});
-        }
-      });
-      
-      const camera = new Camera(video, {
-        onFrame: async () => {
-          await pose.send({image: video});
-          sendFrame(video); 
-        },
+
+      pose.onResults(onPoseResults);
+
+      camera = new Camera(videoElement, {
+        onFrame: async () => await pose.send({image: videoElement}),
         width: 640,
         height: 480
       });
-      
+
       camera.start();
     }
-    
-    function sendFrame(videoElement) {
-      // Frame rate limiting
-      const now = Date.now();
-      if (now - lastFrameTime < FRAME_INTERVAL) return;
-      lastFrameTime = now;
+
+    function detectCameraJerk(currentKeypoints, previousKeypoints) {
+      if (!previousKeypoints) return false;
       
-      // Skip if WebSocket is not ready
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      // Calculate movement for each keypoint
+      const movements = [];
+      let totalMovement = 0;
+      let validPoints = 0;
       
-      const canvas = document.getElementById('capture-canvas');
-      const ctx = canvas.getContext('2d');
-      
-      // Draw video frame to canvas
-      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-      
-      // Get frame as blob and send via WebSocket
-      canvas.toBlob((blob) => {
-        if (blob) {
-          ws.send(blob); // Send as binary data
+      for (let i = 0; i < currentKeypoints.length; i++) {
+        if (currentKeypoints[i][3] > 0.5 && previousKeypoints[i][3] > 0.5) {
+          const dx = currentKeypoints[i][0] - previousKeypoints[i][0];
+          const dy = currentKeypoints[i][1] - previousKeypoints[i][1];
+          const distance = Math.sqrt(dx*dx + dy*dy);
+          movements.push(distance);
+          totalMovement += distance;
+          validPoints++;
         }
-      }, 'image/jpeg', 0.7); // Slightly higher quality for better processing
+      }
+      
+      if (validPoints === 0) return false;
+      
+      // Calculate average movement and standard deviation
+      const avgMovement = totalMovement / validPoints;
+      
+      // Calculate standard deviation
+      let variance = 0;
+      for (const movement of movements) {
+        variance += Math.pow(movement - avgMovement, 2);
+      }
+      const stdDev = Math.sqrt(variance / movements.length);
+      
+      // Camera jerk detection:
+      // 1. High average movement across all points
+      // 2. Low standard deviation (all points moving similarly)
+      // This indicates the whole frame moved, suggesting camera jerk
+      return avgMovement > cameraJerkThreshold && stdDev < avgMovement * 0.4;
     }
-    
+
+    function onPoseResults(results) {
+      const canvasElement = document.getElementById('pose-canvas');
+      const canvasCtx = canvasElement.getContext('2d');
+      const currentTimestamp = Date.now();
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.poseLandmarks) {
+        missingFrames = 0;
+
+        if (!personDetected) {
+          personDetected = true;
+          document.getElementById("form-status").textContent = "OK";
+          document.getElementById("form-status").className = "status good";
+          document.getElementById("feedback-text").textContent = "Person detected";
+        }
+
+        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
+        drawLandmarks(canvasCtx, results.poseLandmarks, { color: '#FF0000', lineWidth: 1, radius: 3 });
+
+        const keypoints = results.poseLandmarks.map(landmark => [
+          landmark.x,
+          landmark.y,
+          landmark.z || 0,
+          landmark.visibility || 1.0
+        ]);
+
+        // Check for camera jerk
+        const detectedJerk = detectCameraJerk(keypoints, lastKeypoints);
+        
+        if (detectedJerk && !isCameraJerk) {
+          isCameraJerk = true;
+          jerkRecoveryFrames = JERK_RECOVERY_COUNT;
+          console.log("Camera jerk detected - ignoring frames");
+        }
+        
+        // Handle jerk recovery
+        if (isCameraJerk) {
+          jerkRecoveryFrames--;
+          if (jerkRecoveryFrames <= 0) {
+            isCameraJerk = false;
+            console.log("Camera jerk recovery complete");
+          }
+        }
+        
+        // Check if we're in rep cooldown period
+        const inRepCooldown = (currentTimestamp - lastRepTime) < repCooldownMs;
+        
+        // Send keypoints if not in jerk recovery mode and not in rep cooldown
+        if (!isCameraJerk && !inRepCooldown) {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: "keypoints",
+              keypoints: keypoints,
+              exercise: exerciseName  // Explicitly include exercise name
+            }));
+          }
+        } else {
+          console.log(`Ignoring frame: ${isCameraJerk ? 'camera jerk' : 'rep cooldown'}`);
+        }
+        
+        lastKeypoints = keypoints;
+        lastFrameTimestamp = currentTimestamp;
+
+      } else {
+        missingFrames++;
+        lastKeypoints = null;
+        lastFrameTimestamp = null;
+        isCameraJerk = false;
+        jerkRecoveryFrames = 0;
+
+        if (missingFrames >= MISSING_THRESHOLD && personDetected) {
+          personDetected = false;
+          handleNoPersonDetected();
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "no_person" }));
+          }
+        }
+      }
+
+      canvasCtx.restore();
+    }
+
+    function handleNoPersonDetected() {
+      document.getElementById("form-status").textContent = "NO PERSON";
+      document.getElementById("form-status").className = "status bad";
+      document.getElementById("feedback-text").textContent = "No person detected";
+    }
+
     function initializeWebSocket() {
-      const wsUrl = `wss://yalla-ai.onlinetestingserver.com/v1/exercise/ws`;
-      // const wsUrl = `ws://localhost:8000/v1/exercise/ws`;
-      
+      const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/v1/exercise/ws?session_id=${sessionId}&exercise=${encodeURIComponent(exerciseName)}`;
       ws = new WebSocket(wsUrl);
-      
-      // Important for binary data handling
-      ws.binaryType = 'arraybuffer';
-      
-      ws.onopen = () => {
-        console.log("WebSocket connected");
-        // Request initial state
-        ws.send("get_state");
-      };
-      
+
+      ws.onopen = () => console.log("WebSocket connected");
+
       ws.onmessage = (event) => {
         try {
-          // Handle binary data (shouldn't receive any from server)
-          if (event.data instanceof ArrayBuffer) {
-            console.log("Received binary data from server");
-            return;
-          }
-          
-          // Parse JSON data
           const data = JSON.parse(event.data);
+          console.log('websocket data', data);
           
-          // Handle different message types
-          if (data.type === 'ping') {
-            ws.send(JSON.stringify({type: 'pong', ts: data.ts}));
-            return;
+          // Update rep cooldown if reps increased
+          if (data.reps !== undefined) {
+            const currentReps = data.reps;
+            const previousReps = parseInt(document.getElementById("rep-counter").textContent) || 0;
+            
+            if (currentReps > previousReps) {
+              lastRepTime = Date.now();
+              console.log(`Rep counted! Cooldown started. New rep count: ${currentReps}`);
+            }
           }
           
-          // Handle frame processing results
-          if (data.status === 'error') {
-            console.error("Backend error:", data.message);
-            document.getElementById('feedback-text').textContent = data.message;
-            return;
-          }
-          
-          // Handle state updates
           updateUI(data);
-          
         } catch (error) {
           console.error("WebSocket parse error:", error);
         }
       };
-      
+
       ws.onclose = () => {
-        console.log("WebSocket closed. Reconnecting...");
-        if (reconnectTimeout) clearTimeout(reconnectTimeout);
-        reconnectTimeout = setTimeout(initializeWebSocket, 2000);
+        console.log("WebSocket closed");
+        setTimeout(initializeWebSocket, 2000);
       };
-      
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-      };
+
+      ws.onerror = (error) => console.error("WebSocket error:", error);
     }
-    
+
     function updateUI(data) {
       if (data.exercise) {
         document.getElementById("exercise-name").textContent = data.exercise;
       }
-      
       if (data.reps !== undefined) {
         document.getElementById("rep-counter").textContent = data.reps;
       }
-      
       if (data.form_ok !== undefined) {
         const formStatus = document.getElementById("form-status");
-        if (data.feedback === "No person detected") {
-          formStatus.textContent = "NO PERSON";
-          formStatus.className = "status bad";
-        } else {
+        if (personDetected) {
           formStatus.textContent = data.form_ok ? "OK" : "FIX";
           formStatus.className = "status " + (data.form_ok ? "good" : "bad");
         }
       }
-      
       if (data.feedback !== undefined) {
-        document.getElementById("feedback-text").textContent = data.feedback || "No feedback yet";
+        if (personDetected) {
+          document.getElementById("feedback-text").textContent = data.feedback || "No feedback yet";
+        }
       }
-    } 
-    
+    }
+
     function setupEventListeners() {
       document.getElementById("stop-btn").addEventListener("click", stopExercise);
     }
-    
+    let exerciseStopped = false;  
     function stopExercise() {
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-        reconnectTimeout = null;
+      if (exerciseStopped) return;   
+      exerciseStopped = true;
+      if (ws && ws.readyState === WebSocket.OPEN) ws.close(1000, "Exercise stopped by user");
+      if (camera) {
+        camera.stop();
+        camera = null;
       }
-      
-      // Create a promise to handle WebSocket closure
-      const closeWebSocket = new Promise((resolve) => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.addEventListener('close', () => {
-            resolve();
-          }, { once: true });
-          
-          // Send a close frame
-          ws.close(1000, "Exercise stopped by user");
-        } else {
-          resolve();
-        }
-      });
-      
-      closeWebSocket.then(() => {
-        return fetch(`${API_BASE_URL}/v1/exercise/stop?session_id=${sessionId}`, { 
-          method: "POST",
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Stop request failed');
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log("Exercise stopped successfully:", data);
-        // Clean up local storage
-        localStorage.removeItem("sessionId");
-        localStorage.removeItem("exerciseName");
-        // Redirect to home page
-        window.location.href = "index.html";
-      })
-      .catch(error => {
-        console.error('Error during stop exercise:', error);
-        // Still redirect even if there's an error
+
+      fetch(`${API_BASE_URL}/v1/exercise/stop?session_id=${sessionId}`, { 
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' }
+      }).finally(() => {
         localStorage.removeItem("sessionId");
         localStorage.removeItem("exerciseName");
         window.location.href = "index.html";
-      })
-      .finally(() => {
-        ws = null;
       });
     }
-    
+
     window.addEventListener("beforeunload", stopExercise);
   </script>
 </body>

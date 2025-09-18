@@ -337,209 +337,46 @@
             100% { box-shadow: 0 0 0 0 rgba(76, 201, 240, 0); }
         }
 
-        /* Mobile Info Panel Styles */
-        .mobile-info-panel {
-            display: none;
-            background: rgba(0,0,0,0.7);
-            border-radius: 10px;
-            padding: 15px;
-            margin: 0 15px;
-            z-index: 2;
-        }
-
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 1rem;
-        }
-
-        .info-row:last-child {
-            margin-bottom: 0;
-        }
-
-        .info-label {
-            font-weight: bold;
-            color: #4cc9f0;
-            width: 80px;
-        }
-
-        /* Base styles for exercise view */
-        #exercise-view {
-            display: none;
-        }
-
-        /* Base styles for stop button */
-        #stop-btn {
-            display: none;
-        }
-
-        /* Mobile styles */
+        /* Responsive Design */
         @media (max-width: 768px) {
-            html, body {
-                height: 100%;
-                margin: 0;
-                padding: 0;
-                overflow: hidden;
+            header h1 {
+                font-size: 2.2rem;
             }
             
-            .container {
-                padding: 0;
-                height: 100vh;
-                max-width: 100%;
-                width: 100%;
+            .card {
+                padding: 20px;
+                margin: 15px;
             }
             
-            #exercise-view {
-                height: 100vh;
-                display: none; /* Keep hidden by default */
-                flex-direction: column;
-            }
-            
-            /* Show exercise view when active */
-            #exercise-view.active {
-                display: flex;
-            }
-            
-            /* Fixed header positioning - only visible when exercise is active */
             .exercise-header {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                z-index: 10;
-                background: rgba(0,0,0,0.5);
-                padding: 10px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: auto;
-            }
-            
-            .exercise-header h1 {
-                font-size: 1.5rem;
-                margin: 0;
+                flex-direction: column;
                 text-align: center;
             }
             
-            /* Hide stop button in header on mobile */
-            .exercise-header #stop-btn {
-                display: none;
-            }
-            
-            .exercise-container {
-                position: relative;
-                height: 100vh;
-                width: 100%;
-                display: flex;
-                flex-direction: column;
-            }
-            
-            .video-feed {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                z-index: 1;
-                margin: 0;
-            }
-            
-            .video-placeholder {
-                width: 100%;
-                height: 100%;
-                border-radius: 0;
+            .stat-box {
+                min-width: 120px;
+                padding: 15px;
             }
             
             #camera-stream, #pose-canvas {
                 width: 100%;
-                height: 100%;
-                object-fit: cover;
-                border-radius: 0;
+                height: auto;
+                max-width: 100%;
             }
             
-            /* Hide desktop panels on mobile */
-            .stats-panel, .feedback-panel {
-                display: none;
-            }
-            
-            /* Show mobile info panel */
-            .mobile-info-panel {
-                display: none;
-                position: absolute;
-                bottom: 70px;
-                left: 0;
-                right: 0;
-                z-index: 2;
-                margin: 0 15px;
-                background: rgba(0,0,0,0.7);
-                border-radius: 10px;
-                padding: 15px;
-            }
-            
-            .info-row {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 8px;
+            /* Improved dropdown responsiveness */
+            select {
                 font-size: 1rem;
+                padding: 12px;
             }
             
-            .info-row:last-child {
-                margin-bottom: 0;
-            }
-            
-            .info-label {
-                font-weight: bold;
-                color: #4cc9f0;
-                width: 80px;
-            }
-            
-            /* Fixed stop button at bottom - only visible when exercise is active */
-            #stop-btn {
-                position: fixed;
-                bottom: 10px;
-                left: 50%;
-                transform: translateX(-50%);
-                z-index: 20;
-                max-width: 90%;
-                width: 90%;
-                margin: 0;
-                display: none; /* Keep hidden by default */
-            }
-            
-            /* Show stop button when exercise is active */
-            #exercise-view.active #stop-btn {
-                display: block;
-            }
-            
-            .loader, .camera-permission {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                z-index: 5;
-                background: rgba(0,0,0,0.7);
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-            }
-            
-            .person-detection-overlay {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                z-index: 3;
+            button {
+                font-size: 1rem;
+                padding: 12px;
             }
             
             .overlay-content {
-                background: rgba(0,0,0,0.8);
                 padding: 20px;
-                border-radius: 10px;
-                max-width: 90%;
             }
             
             .overlay-content i {
@@ -552,6 +389,53 @@
             
             .overlay-content p {
                 font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header h1 {
+                font-size: 1.8rem;
+            }
+            
+            header p {
+                font-size: 1rem;
+            }
+            
+            .stats-panel {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .stat-box {
+                width: 100%;
+                max-width: 200px;
+            }
+            
+            /* Further improved dropdown for small screens */
+            select {
+                font-size: 0.9rem;
+                padding: 10px;
+            }
+            
+            button {
+                font-size: 0.9rem;
+                padding: 10px;
+            }
+            
+            .overlay-content {
+                padding: 15px;
+            }
+            
+            .overlay-content i {
+                font-size: 2.5rem;
+            }
+            
+            .overlay-content h3 {
+                font-size: 1.3rem;
+            }
+            
+            .overlay-content p {
+                font-size: 0.9rem;
             }
         }
 
@@ -655,26 +539,7 @@
                         <div id="form-status" class="status">OK</div>
                     </div>
                 </div>
-                <!-- Add this new panel inside the exercise-container, after the stats-panel -->
-                <div class="mobile-info-panel">
-                    <div class="info-row">
-                        <span class="info-label">Exercise:</span>
-                        <span id="exercise-name-mobile">Exercise</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Reps:</span>
-                        <span id="rep-counter-mobile">0</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Posture:</span>
-                        <span id="form-status-mobile">OK</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Feedback:</span>
-                        <span id="feedback-text-mobile">No feedback yet</span>
-                    </div>
-                </div>
-
+                
                 <div class="video-feed">
                     <div class="video-placeholder">
                         <video id="camera-stream" autoplay playsinline></video>
@@ -839,16 +704,7 @@
                     
                     // Reset UI state for new exercise
                     resetExerciseState();
-                    camera = new Camera(cameraStream, {
-                        onFrame: async () => {
-                        await pose.send({ image: cameraStream });
-                        },
-                        width: 640,
-                        height: 480
-                    });
-
-                    // start webcam
-                    camera.start();
+                    
                     showExerciseView();
                     initializeExercise();
                 } else {
@@ -890,9 +746,7 @@
         // Show exercise view with animation
         function showExerciseView() {
             selectionView.style.display = 'none';
-            // exerciseView.style.display = 'block';
-            exerciseView.style.display = 'flex'; // Use flex for mobile layout
-            exerciseView.classList.add('active')
+            exerciseView.style.display = 'block';
             exerciseNameEl.textContent = exerciseName;
         }
 
@@ -900,7 +754,6 @@
         function showSelectionView() {
             exerciseView.style.display = 'none';
             selectionView.style.display = 'block';
-             exerciseView.classList.remove('active')
         }
 
         // Initialize exercise monitoring
@@ -916,9 +769,6 @@
             
             // Initialize WebSocket connection
             initializeWebSocket();
-             if (window.innerWidth <= 768) {
-                document.querySelector('.mobile-info-panel').style.display = 'block';
-            }
         }
 
         // Initialize MediaPipe Pose
@@ -1012,10 +862,6 @@
 
         // Process pose results
         function onPoseResults(results) {
-            if (loader.style.display !== 'none') {
-                loader.style.display = 'none'; 
-                cameraPermission.style.display = 'none';
-            }
             let canvasCtx = null;
             try {
                 canvasCtx = poseCanvas.getContext('2d');
@@ -1238,12 +1084,7 @@
             personDetectionOverlay.classList.remove('active');
             cameraStream.classList.remove('blur');
             poseCanvas.classList.remove('blur');
-            
-            if (camera) {
-                camera.stop();
-                camera = null;
-            }
-    
+
             // Call API to stop exercise
             fetch(`${API_BASE_URL}/stop?session_id=${sessionId}`, { 
                 method: "POST",
@@ -1259,6 +1100,7 @@
         }
         window.addEventListener("beforeunload", () => {
             if (sessionId && exerciseActive) {
+                // Try to stop exercise gracefully
                 stopExercise();
             }
         });
