@@ -721,8 +721,8 @@
 
     <script>
         // Configuration
-        const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
-        // const API_BASE_URL = 'http://localhost:8000/v1/exercise';
+        //const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
+        const API_BASE_URL = 'http://localhost:8000/v1/exercise';
 
         // Global variables
         let ws = null;
@@ -742,10 +742,6 @@
         let isCameraJerk = false;
         let jerkRecoveryFrames = 0;
         const JERK_RECOVERY_COUNT = 30;
-
-        // Rep cooldown to prevent multiple counts
-        let lastRepTime = 0;
-        const repCooldownMs = 500; // 1 second cooldown after a rep
 
         // Whole body detection variables
         const bodyVisibilityThreshold = 0.7; // 70% of key points must be visible
@@ -892,7 +888,6 @@
             lastFrameTimestamp = null;
             isCameraJerk = false;
             jerkRecoveryFrames = 0;
-            lastRepTime = 0;
 
             // Reset overlay and blur
             personDetectionOverlay.classList.remove('active');
@@ -981,8 +976,6 @@
                     .then(() => {
                         console.log('Camera started successfully');
 
-                        // Remove the duplicate code that was here
-
                         const waitForVideo = setInterval(() => {
                             if (cameraStream.videoWidth > 0 && cameraStream.videoHeight > 0) {
                                 clearInterval(waitForVideo);
@@ -992,7 +985,6 @@
                                 poseCanvas.height = cameraStream.videoHeight;
                                 poseCanvas.style.width = '100%';
                                 poseCanvas.style.height = '100%';
-                                console.log(`Canvas set to: ${poseCanvas.width}x${poseCanvas.height}`);
 
                                 // Set a timeout to hide loader if no pose results are received after 5 seconds
                                 setTimeout(() => {
@@ -1084,8 +1076,7 @@
 
                     drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
                     drawLandmarks(canvasCtx, results.poseLandmarks, { color: '#FF0000', lineWidth: 1, radius: 3 });
-                    console.log("Canvas dimensions:", poseCanvas.width, poseCanvas.height);
-                    console.log("Landmarks count:", results.poseLandmarks ? results.poseLandmarks.length : 0);
+
                     const keypoints = results.poseLandmarks.map(landmark => [
                         landmark.x,
                         landmark.y,
@@ -1120,12 +1111,10 @@
                         }
                     }
 
-                    // Check if we're in rep cooldown period
-                    const inRepCooldown = (currentTimestamp - lastRepTime) < repCooldownMs;
-
-                    // Send keypoints if whole body is visible, not in jerk recovery mode, and not in rep cooldown
-                    if (wholeBodyDetected && !isCameraJerk && !inRepCooldown) {
+                    // Send keypoints if whole body is visible and not in jerk recovery mode
+                    if (wholeBodyDetected && !isCameraJerk) {
                         if (ws && ws.readyState === WebSocket.OPEN) {
+                            console.log('Sending keypoints to backend:', { exercise: exerciseName, keypointsCount: keypoints.length });
                             ws.send(JSON.stringify({
                                 type: "keypoints",
                                 keypoints: keypoints,
@@ -1133,7 +1122,7 @@
                             }));
                         }
                     } else {
-                        console.log(`Ignoring frame: ${!wholeBodyDetected ? 'whole body not visible' : (isCameraJerk ? 'camera jerk' : 'rep cooldown')}`);
+                        console.log(`Ignoring frame: ${!wholeBodyDetected ? 'whole body not visible' : 'camera jerk'}`);
                     }
 
                     lastKeypoints = keypoints;
@@ -1152,6 +1141,7 @@
                         personDetected = false;
                         handleNoPersonDetected();
                         if (ws && ws.readyState === WebSocket.OPEN) {
+                            console.log('Sending "no_person" message to backend');
                             ws.send(JSON.stringify({ type: "no_person" }));
                         }
                     }
@@ -1207,32 +1197,18 @@
         // Initialize WebSocket connection
         function initializeWebSocket() {
             const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws?session_id=${sessionId}`;
+            console.log('Connecting to WebSocket:', wsUrl);
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log("WebSocket connected");
+                console.log("WebSocket connected successfully");
                 resetExerciseState();
             };
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    console.log('WebSocket data:', data);
-
-                    // Update rep cooldown if reps increased
-                    if (data.reps !== undefined) {
-                        const currentReps = data.reps;
-                        const previousReps = parseInt(repCounter.textContent) || 0;
-
-                        if (currentReps > previousReps) {
-                            lastRepTime = Date.now();
-                            console.log(`Rep counted! Cooldown started. New rep count: ${currentReps}`);
-
-                            // Add animation effect for rep counter
-                            repCounter.classList.add('pulse');
-                            setTimeout(() => repCounter.classList.remove('pulse'), 1000);
-                        }
-                    }
+                    console.log('Received data from WebSocket:', data);
 
                     updateUI(data);
                 } catch (error) {
@@ -1248,7 +1224,9 @@
                 }
             };
 
-            ws.onerror = (error) => console.error("WebSocket error:", error);
+            ws.onerror = (error) => {
+                console.error("WebSocket error:", error);
+            };
         }
 
         // Update UI with exercise data
@@ -1317,9 +1295,12 @@
             exerciseStopped = true;
             exerciseActive = false; // Set exercise as inactive
 
+            console.log('Stopping exercise...');
+
             // Close WebSocket connection
             if (ws) {
                 if (ws.readyState === WebSocket.OPEN) {
+                    console.log('Closing WebSocket connection');
                     ws.close(1000, "Exercise stopped by user");
                 }
                 ws = null;
@@ -1336,10 +1317,15 @@
             }
 
             // Call API to stop exercise
+            console.log('Sending stop request to API');
             fetch(`${API_BASE_URL}/stop?session_id=${sessionId}`, {
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' }
             })
+                .then(response => {
+                    console.log('Stop API response:', response);
+                    return response.json();
+                })
                 .catch(error => console.error('Error stopping exercise:', error))
                 .finally(() => {
                     // Redirect to a clean URL without parameters
