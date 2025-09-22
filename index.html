@@ -721,8 +721,8 @@
 
     <script>
         // Configuration
-        //const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
-        const API_BASE_URL = 'http://localhost:8000/v1/exercise';
+        const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
+        // const API_BASE_URL = 'http://localhost:8000/v1/exercise';
 
         // Global variables
         let ws = null;
@@ -1114,7 +1114,6 @@
                     // Send keypoints if whole body is visible and not in jerk recovery mode
                     if (wholeBodyDetected && !isCameraJerk) {
                         if (ws && ws.readyState === WebSocket.OPEN) {
-                            console.log('Sending keypoints to backend:', { exercise: exerciseName, keypointsCount: keypoints.length });
                             ws.send(JSON.stringify({
                                 type: "keypoints",
                                 keypoints: keypoints,
@@ -1141,7 +1140,6 @@
                         personDetected = false;
                         handleNoPersonDetected();
                         if (ws && ws.readyState === WebSocket.OPEN) {
-                            console.log('Sending "no_person" message to backend');
                             ws.send(JSON.stringify({ type: "no_person" }));
                         }
                     }
@@ -1197,7 +1195,6 @@
         // Initialize WebSocket connection
         function initializeWebSocket() {
             const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws?session_id=${sessionId}`;
-            console.log('Connecting to WebSocket:', wsUrl);
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
@@ -1208,7 +1205,6 @@
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    console.log('Received data from WebSocket:', data);
 
                     updateUI(data);
                 } catch (error) {
@@ -1295,8 +1291,6 @@
             exerciseStopped = true;
             exerciseActive = false; // Set exercise as inactive
 
-            console.log('Stopping exercise...');
-
             // Close WebSocket connection
             if (ws) {
                 if (ws.readyState === WebSocket.OPEN) {
@@ -1317,7 +1311,6 @@
             }
 
             // Call API to stop exercise
-            console.log('Sending stop request to API');
             fetch(`${API_BASE_URL}/stop?session_id=${sessionId}`, {
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' }
