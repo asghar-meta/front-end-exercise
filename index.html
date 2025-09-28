@@ -1206,7 +1206,7 @@
                 try {
                     const data = JSON.parse(event.data);
                     //console.log('Received data from WebSocket:', data);
-                    //logToMobileConsole('WebSocket message received', data);
+                    logToMobileConsole('WebSocket message received', data);
                     updateUI(data);
                 } catch (error) {
                     console.error("WebSocket parse error:", error);
