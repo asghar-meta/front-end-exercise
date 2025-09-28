@@ -721,8 +721,8 @@
 
     <script>
         // Configuration
-        //const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
-        const API_BASE_URL = 'http://localhost:8000/v1/exercise';
+        const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
+        // const API_BASE_URL = 'http://localhost:8000/v1/exercise';
 
         // Global variables
         let ws = null;
@@ -1206,8 +1206,8 @@
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    console.log('Received data from WebSocket:', data);
-
+                    //console.log('Received data from WebSocket:', data);
+                    logToMobileConsole('WebSocket message received', data);
                     updateUI(data);
                 } catch (error) {
                     console.error("WebSocket parse error:", error);
