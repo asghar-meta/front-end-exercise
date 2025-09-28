@@ -503,7 +503,7 @@
 
             /* Show mobile info panel */
             .mobile-info-panel {
-                display: none;
+                display: block !important;
                 position: absolute;
                 bottom: 70px;
                 left: 0;
@@ -721,8 +721,8 @@
 
     <script>
         // Configuration
-        //const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
-        const API_BASE_URL = 'http://localhost:8000/v1/exercise';
+        const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
+        //const API_BASE_URL = 'http://localhost:8000/v1/exercise';
 
         // Global variables
         let ws = null;
@@ -827,6 +827,7 @@
             }
 
             // Set up event listener for stop button
+            createMobileDebugConsole();
             stopBtn.addEventListener('click', stopExercise);
         });
 
@@ -1208,8 +1209,8 @@
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    console.log('Received data from WebSocket:', data);
-
+                    //console.log('Received data from WebSocket:', data);
+                    logToMobileConsole('WebSocket message received', data);
                     updateUI(data);
                 } catch (error) {
                     console.error("WebSocket parse error:", error);
@@ -1337,6 +1338,94 @@
                     exerciseStopped = false;
                 });
         }
+
+        function createMobileDebugConsole() {
+            // Only create on mobile devices
+            if (window.innerWidth > 768) return;
+            
+            const debugConsole = document.createElement('div');
+            debugConsole.id = 'mobile-debug-console';
+            debugConsole.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                width: 300px;
+                max-height: 200px;
+                overflow-y: auto;
+                background: rgba(0, 0, 0, 0.9);
+                color: #00ff00;
+                padding: 10px;
+                border-radius: 8px;
+                font-family: monospace;
+                font-size: 12px;
+                z-index: 10000;
+                border: 2px solid #00ff00;
+                box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            `;
+            
+            // Add close button
+            const closeBtn = document.createElement('div');
+            closeBtn.textContent = '×';
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: 5px;
+                right: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                color: #ff0000;
+            `;
+            closeBtn.onclick = () => debugConsole.style.display = 'none';
+            debugConsole.appendChild(closeBtn);
+            
+            // Add title
+            const title = document.createElement('div');
+            title.textContent = 'WebSocket Debug';
+            title.style.cssText = `
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: #00ffff;
+                border-bottom: 1px solid #00ff00;
+                padding-bottom: 5px;
+            `;
+            debugConsole.appendChild(title);
+            
+            // Add to page
+            document.body.appendChild(debugConsole);
+            
+            // Store reference
+            window.mobileDebugConsole = debugConsole;
+        }
+
+        // Add this function to log to the debug console
+        function logToMobileConsole(message, data = null) {
+            if (!window.mobileDebugConsole || window.innerWidth > 768) return;
+            
+            const logEntry = document.createElement('div');
+            logEntry.style.marginBottom = '8px';
+            logEntry.style.borderLeft = '2px solid #00ff00';
+            logEntry.style.paddingLeft = '8px';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            let logContent = `<span style="color: #ffff00;">[${timestamp}]</span> ${message}`;
+            
+            if (data) {
+                logContent += `<br><span style="color: #00ffff;">${JSON.stringify(data)}</span>`;
+            }
+            
+            logEntry.innerHTML = logContent;
+            
+            // Add to console
+            window.mobileDebugConsole.appendChild(logEntry);
+            
+            // Auto scroll to bottom
+            window.mobileDebugConsole.scrollTop = window.mobileDebugConsole.scrollHeight;
+            
+            // Keep only last 20 entries
+            while (window.mobileDebugConsole.children.length > 25) {
+                window.mobileDebugConsole.removeChild(window.mobileDebugConsole.children[2]); // Skip title and close btn
+            }
+        }
+
     </script>
 </body>
 
