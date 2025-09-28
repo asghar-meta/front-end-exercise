@@ -1114,6 +1114,12 @@
                     // Send keypoints if whole body is visible and not in jerk recovery mode
                     if (wholeBodyDetected && !isCameraJerk) {
                         if (ws && ws.readyState === WebSocket.OPEN) {
+                            data = JSON.stringify({
+                                type: "keypoints",
+                                keypoints: keypoints,
+                                exercise: exerciseName
+                            })
+                            logToMobileConsole('sending data to backend, keypoints: ', data);
                             ws.send(JSON.stringify({
                                 type: "keypoints",
                                 keypoints: keypoints,
@@ -1206,7 +1212,7 @@
                 try {
                     const data = JSON.parse(event.data);
                     //console.log('Received data from WebSocket:', data);
-                    logToMobileConsole('WebSocket message received', data);
+                    l//logToMobileConsole('WebSocket message received', data);
                     updateUI(data);
                 } catch (error) {
                     console.error("WebSocket parse error:", error);
@@ -1402,7 +1408,7 @@
             let logContent = `<span style="color: #ffff00;">[${timestamp}]</span> ${message}`;
             
             if (data) {
-                logContent += `<br><span style="color: #00ffff;">${JSON.stringify(data)}</span>`;
+                logContent += `<br><span style="color: #00ffff;">${data}</span>`;
             }
             
             logEntry.innerHTML = logContent;
