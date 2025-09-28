@@ -637,6 +637,18 @@
             margin-bottom: 15px;
             color: var(--warning);
         }
+
+        /* Pulse animation for rep counter */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        #rep-counter-mobile.pulse {
+            animation: pulse 0.5s ease-in-out;
+            display: inline-block;
+        }
     </style>
 </head>
 
@@ -806,6 +818,9 @@
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', () => {
+            // Create mobile debug console FIRST
+            createMobileDebugConsole();
+            
             // Parse URL parameters to get session ID and exercise name
             const urlParams = new URLSearchParams(window.location.search);
             const urlSessionId = urlParams.get('session_id');
@@ -826,7 +841,6 @@
             }
 
             // Set up event listener for stop button
-            createMobileDebugConsole();
             stopBtn.addEventListener('click', stopExercise);
         });
 
@@ -937,6 +951,7 @@
                 locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
             });
 
+            // UPDATED: Set model complexity to 0 and confidence to 0.7
             pose.setOptions({
                 modelComplexity: 0,
                 smoothLandmarks: true,
@@ -1114,12 +1129,6 @@
                     // Send keypoints if whole body is visible and not in jerk recovery mode
                     if (wholeBodyDetected && !isCameraJerk) {
                         if (ws && ws.readyState === WebSocket.OPEN) {
-                            data = JSON.stringify({
-                                type: "keypoints",
-                                keypoints: keypoints,
-                                exercise: exerciseName
-                            })
-                            logToMobileConsole('sending data to backend, keypoints: ', data);
                             ws.send(JSON.stringify({
                                 type: "keypoints",
                                 keypoints: keypoints,
@@ -1201,56 +1210,99 @@
         // Initialize WebSocket connection
         function initializeWebSocket() {
             const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws?session_id=${sessionId}`;
+            logToMobileConsole('Connecting to WebSocket', { url: wsUrl });
+            
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log("WebSocket connected successfully");
+                logToMobileConsole('WebSocket connected successfully');
                 resetExerciseState();
             };
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    //console.log('Received data from WebSocket:', data);
-                    l//logToMobileConsole('WebSocket message received', data);
+                    logToMobileConsole('WebSocket message received', data);
                     updateUI(data);
                 } catch (error) {
+                    logToMobileConsole('WebSocket parse error', { error: error.message });
                     console.error("WebSocket parse error:", error);
                 }
             };
 
-            ws.onclose = () => {
-                console.log("WebSocket closed");
+            ws.onclose = (event) => {
+                logToMobileConsole('WebSocket closed', { 
+                    code: event.code, 
+                    reason: event.reason 
+                });
+                
                 // Only reconnect if exercise is still active
                 if (exerciseActive) {
+                    logToMobileConsole('Attempting to reconnect...');
                     setTimeout(initializeWebSocket, 2000);
                 }
             };
 
             ws.onerror = (error) => {
+                logToMobileConsole('WebSocket error', { 
+                    message: error.message || 'Unknown error' 
+                });
                 console.error("WebSocket error:", error);
             };
         }
 
         // Update UI with exercise data
         function updateUI(data) {
+            // Log the received data for debugging
+            if (window.innerWidth <= 768) {
+                console.log('Mobile UI update called with:', data);
+            }
+            
             if (data.exercise) {
                 const mobileExerciseName = document.getElementById('exercise-name-mobile');
                 if (mobileExerciseName) {
                     mobileExerciseName.textContent = data.exercise;
                 }
             }
+            
             if (data.reps !== undefined) {
+                // Update desktop counter
                 repCounter.textContent = data.reps;
+                
+                // CRITICAL FIX FOR MOBILE
                 const mobileRepCounter = document.getElementById('rep-counter-mobile');
                 if (mobileRepCounter) {
-                    mobileRepCounter.textContent = data.reps;
-
-                    // Add animation effect for mobile rep counter
-                    mobileRepCounter.classList.add('pulse');
-                    setTimeout(() => mobileRepCounter.classList.remove('pulse'), 1000);
+                    // Force DOM refresh on mobile
+                    if (window.innerWidth <= 768) {
+                        // Method 1: Direct text update with animation
+                        mobileRepCounter.classList.add('pulse');
+                        mobileRepCounter.textContent = data.reps;
+                        
+                        // Method 2: Force reflow by accessing offsetHeight
+                        void mobileRepCounter.offsetHeight;
+                        
+                        // Method 3: Remove and re-add element to force refresh
+                        const parent = mobileRepCounter.parentNode;
+                        const clone = mobileRepCounter.cloneNode(true);
+                        clone.textContent = data.reps;
+                        parent.replaceChild(clone, mobileRepCounter);
+                        
+                        // Clean up animation
+                        setTimeout(() => {
+                            const newElement = document.getElementById('rep-counter-mobile');
+                            if (newElement) newElement.classList.remove('pulse');
+                        }, 1000);
+                    } else {
+                        // Desktop update
+                        mobileRepCounter.textContent = data.reps;
+                        mobileRepCounter.classList.add('pulse');
+                        setTimeout(() => mobileRepCounter.classList.remove('pulse'), 1000);
+                    }
+                } else {
+                    console.error('Mobile rep counter element not found!');
                 }
             }
+            
             if (data.form_ok !== undefined) {
                 if (personDetected) {
                     const statusText = data.form_ok ? "OK" : "FIX";
@@ -1264,6 +1316,7 @@
                     }
                 }
             }
+            
             if (data.feedback !== undefined) {
                 if (personDetected) {
                     feedbackText.textContent = data.feedback || "No feedback yet";
@@ -1301,7 +1354,7 @@
             // Close WebSocket connection
             if (ws) {
                 if (ws.readyState === WebSocket.OPEN) {
-                    console.log('Closing WebSocket connection');
+                    logToMobileConsole('Closing WebSocket connection');
                     ws.close(1000, "Exercise stopped by user");
                 }
                 ws = null;
@@ -1342,24 +1395,30 @@
             // Only create on mobile devices
             if (window.innerWidth > 768) return;
             
+            // Remove existing console if it exists
+            const existingConsole = document.getElementById('mobile-debug-console');
+            if (existingConsole) {
+                existingConsole.remove();
+            }
+            
             const debugConsole = document.createElement('div');
             debugConsole.id = 'mobile-debug-console';
             debugConsole.style.cssText = `
                 position: fixed;
                 top: 10px;
                 right: 10px;
-                width: 300px;
-                max-height: 200px;
+                width: 320px;
+                max-height: 250px;
                 overflow-y: auto;
-                background: rgba(0, 0, 0, 0.9);
+                background: rgba(0, 0, 0, 0.95);
                 color: #00ff00;
-                padding: 10px;
+                padding: 12px;
                 border-radius: 8px;
                 font-family: monospace;
                 font-size: 12px;
                 z-index: 10000;
                 border: 2px solid #00ff00;
-                box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+                box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
             `;
             
             // Add close button
@@ -1370,21 +1429,23 @@
                 top: 5px;
                 right: 5px;
                 cursor: pointer;
-                font-size: 16px;
+                font-size: 18px;
                 color: #ff0000;
+                font-weight: bold;
             `;
             closeBtn.onclick = () => debugConsole.style.display = 'none';
             debugConsole.appendChild(closeBtn);
             
             // Add title
             const title = document.createElement('div');
-            title.textContent = 'WebSocket Debug';
+            title.textContent = 'WebSocket Data';
             title.style.cssText = `
                 font-weight: bold;
                 margin-bottom: 10px;
                 color: #00ffff;
                 border-bottom: 1px solid #00ff00;
                 padding-bottom: 5px;
+                text-align: center;
             `;
             debugConsole.appendChild(title);
             
@@ -1393,22 +1454,36 @@
             
             // Store reference
             window.mobileDebugConsole = debugConsole;
+            
+            // Log that debug console is ready
+            logToMobileConsole('Debug console initialized');
         }
 
-        // Add this function to log to the debug console
         function logToMobileConsole(message, data = null) {
             if (!window.mobileDebugConsole || window.innerWidth > 768) return;
             
             const logEntry = document.createElement('div');
-            logEntry.style.marginBottom = '8px';
-            logEntry.style.borderLeft = '2px solid #00ff00';
-            logEntry.style.paddingLeft = '8px';
+            logEntry.style.cssText = `
+                margin-bottom: 8px;
+                padding: 5px;
+                background: rgba(0, 50, 0, 0.7);
+                border-radius: 4px;
+                border-left: 3px solid #00ff00;
+            `;
             
             const timestamp = new Date().toLocaleTimeString();
-            let logContent = `<span style="color: #ffff00;">[${timestamp}]</span> ${message}`;
+            let logContent = `<div style="color: #ffff00; font-size: 10px;">${timestamp}</div>`;
+            logContent += `<div style="color: #ffffff; margin-top: 3px;">${message}</div>`;
             
             if (data) {
-                logContent += `<br><span style="color: #00ffff;">${data}</span>`;
+                // Format JSON data nicely
+                let formattedData;
+                if (typeof data === 'object') {
+                    formattedData = JSON.stringify(data, null, 2);
+                } else {
+                    formattedData = String(data);
+                }
+                logContent += `<div style="color: #00ccff; margin-top: 5px; font-size: 11px; white-space: pre-wrap;">${formattedData}</div>`;
             }
             
             logEntry.innerHTML = logContent;
@@ -1419,8 +1494,8 @@
             // Auto scroll to bottom
             window.mobileDebugConsole.scrollTop = window.mobileDebugConsole.scrollHeight;
             
-            // Keep only last 20 entries
-            while (window.mobileDebugConsole.children.length > 25) {
+            // Keep only last 15 entries
+            while (window.mobileDebugConsole.children.length > 18) { // 15 + title + close btn
                 window.mobileDebugConsole.removeChild(window.mobileDebugConsole.children[2]); // Skip title and close btn
             }
         }
