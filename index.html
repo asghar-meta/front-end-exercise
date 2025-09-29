@@ -734,7 +734,7 @@
     <script>
         // Configuration
         //const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
-        const API_BASE_URL = 'https://jamel-unscored-perdurably.ngrok-free.dev';
+        const API_BASE_URL = 'https://jamel-unscored-perdurably.ngrok-free.dev/v1/exercise';
 
         // Global variables
         let ws = null;
@@ -1129,6 +1129,16 @@
                     // Send keypoints if whole body is visible and not in jerk recovery mode
                     if (wholeBodyDetected && !isCameraJerk) {
                         if (ws && ws.readyState === WebSocket.OPEN) {
+                            data = JSON.stringify({
+                                type: "keypoints",
+                                keypoints: keypoints,
+                                exercise: exerciseName
+                            })
+
+                            logToMobileConsole(
+                                `WebSocket sending ${keypoints.length} keypoints`,
+                                keypoints
+                            );
                             ws.send(JSON.stringify({
                                 type: "keypoints",
                                 keypoints: keypoints,
