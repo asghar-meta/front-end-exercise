@@ -1284,9 +1284,9 @@
 
             ws.onclose = (event) => {
                 //logToMobileConsole('WebSocket closed', { 
-                    code: event.code, 
+                //    code: event.code, 
                     reason: event.reason 
-                });
+                //});
                 
                 // Only reconnect if exercise is still active
                 if (exerciseActive) {
@@ -1296,12 +1296,13 @@
             };
 
             ws.onerror = (error) => {
-                //logToMobileConsole('WebSocket error', { 
-                //    message: error.message || 'Unknown error' 
-                //});
+                logToMobileConsole('WebSocket error', { 
+                    message: error.message || 'Unknown error' 
+                });
                 console.error("WebSocket error:", error);
             };
         }
+        
 
         // Format time in MM:SS format
         function formatTime(milliseconds) {
