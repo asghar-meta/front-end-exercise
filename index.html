@@ -674,7 +674,7 @@
             <main class="exercise-container">
                 <div class="stats-panel">
                     <div class="stat-box">
-                        <h3>REPS</h3>
+                        <h3 id="counter-label">REPS</h3>
                         <div id="rep-counter" class="counter">0</div>
                     </div>
 
@@ -690,7 +690,7 @@
                         <span id="exercise-name-mobile">Exercise</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Reps:</span>
+                        <span class="info-label" id="counter-label-mobile">Reps:</span>
                         <span id="rep-counter-mobile">0</span>
                     </div>
                     <div class="info-row">
@@ -763,6 +763,20 @@
         // Camera ready flags
         let cameraReady = false;
         let firstPoseResultReceived = false;
+        
+        // Timer variables for plank exercises
+        let timerInterval = null;
+        let elapsedTime = 0; // in milliseconds
+        let timerRunning = false;
+        let isPlankExercise = false;
+        let lastTimerUpdate = 0;
+        let overlayActive = false; // Track if overlay is active
+        const validPlankFeedbacks = [
+            "good form",
+            "Hips too high - lower them!",
+            "Hips sagging - lift them up!",
+            "Doing Good Keep it"
+        ];
 
         // DOM Elements
         const exerciseView = document.getElementById('exercise-view');
@@ -776,6 +790,8 @@
         const cameraPermission = document.querySelector('.camera-permission');
         const personDetectionOverlay = document.querySelector('.person-detection-overlay');
         const videoPlaceholder = document.querySelector('.video-placeholder');
+        const counterLabel = document.getElementById('counter-label');
+        const counterLabelMobile = document.getElementById('counter-label-mobile');
 
         // Check if whole body is visible
         function isWholeBodyVisible(landmarks) {
@@ -829,7 +845,17 @@
             if (urlSessionId && urlExerciseName) {
                 // Use the parameters from the URL
                 sessionId = urlSessionId;
-                exerciseName = urlExerciseName;
+                exerciseName = urlExerciseName.toLowerCase(); // Convert to lowercase for consistent comparison
+                
+                // Check if this is a plank exercise
+                isPlankExercise = exerciseName.includes('plank');
+                
+                // Update UI based on exercise type
+                if (isPlankExercise) {
+                    counterLabel.textContent = 'TIME';
+                    counterLabelMobile.textContent = 'Time:';
+                }
+                
                 exerciseActive = true;
 
                 // Show exercise view and initialize
@@ -902,11 +928,21 @@
             lastFrameTimestamp = null;
             isCameraJerk = false;
             jerkRecoveryFrames = 0;
+            overlayActive = false;
 
             // Reset overlay and blur
             personDetectionOverlay.classList.remove('active');
             cameraStream.classList.remove('blur');
             poseCanvas.classList.remove('blur');
+            
+            // Reset timer variables
+            elapsedTime = 0;
+            timerRunning = false;
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            updateTimerDisplay();
         }
 
         // Show exercise view with animation
@@ -1185,10 +1221,17 @@
                 personDetectionOverlay.classList.remove('active');
                 cameraStream.classList.remove('blur');
                 poseCanvas.classList.remove('blur');
+                overlayActive = false;
             } else {
                 personDetectionOverlay.classList.add('active');
                 cameraStream.classList.add('blur');
                 poseCanvas.classList.add('blur');
+                overlayActive = true;
+                
+                // Stop timer if running and this is a plank exercise
+                if (timerRunning && isPlankExercise) {
+                    stopTimer();
+                }
             }
         }
 
@@ -1209,6 +1252,11 @@
 
             if (mobileFeedbackText) {
                 mobileFeedbackText.textContent = "No person detected";
+            }
+            
+            // Stop timer if running
+            if (timerRunning && isPlankExercise) {
+                stopTimer();
             }
         }
 
@@ -1256,6 +1304,49 @@
             };
         }
 
+        // Format time in MM:SS format
+        function formatTime(milliseconds) {
+            const totalSeconds = Math.floor(milliseconds / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Update timer display
+        function updateTimerDisplay() {
+            if (isPlankExercise) {
+                repCounter.textContent = formatTime(elapsedTime);
+                const mobileRepCounter = document.getElementById('rep-counter-mobile');
+                if (mobileRepCounter) {
+                    mobileRepCounter.textContent = formatTime(elapsedTime);
+                }
+            }
+        }
+
+        // Start timer
+        function startTimer() {
+            if (!isPlankExercise || timerRunning || overlayActive) return;
+            
+            timerRunning = true;
+            lastTimerUpdate = Date.now();
+            
+            timerInterval = setInterval(() => {
+                const now = Date.now();
+                const deltaTime = now - lastTimerUpdate;
+                elapsedTime += deltaTime;
+                lastTimerUpdate = now;
+                updateTimerDisplay();
+            }, 100); // Update every 100ms for smooth display
+        }
+
+        // Stop timer
+        function stopTimer() {
+            if (!isPlankExercise || !timerRunning) return;
+            
+            timerRunning = false;
+            clearInterval(timerInterval);
+        }
+
         // Update UI with exercise data
         function updateUI(data) {
             // Log the received data for debugging
@@ -1270,8 +1361,28 @@
                 }
             }
             
-            if (data.reps !== undefined) {
-                // Update desktop counter
+            // Handle timer for plank exercises
+            if (isPlankExercise && data.feedback !== undefined) {
+                const feedbackTextLower = data.feedback.toLowerCase();
+                
+                // Check if feedback is one of the valid plank feedbacks
+                const isValidPlankFeedback = validPlankFeedbacks.some(feedback => 
+                    feedbackTextLower.includes(feedback.toLowerCase())
+                );
+                
+                if (isValidPlankFeedback && !overlayActive) {
+                    if (!timerRunning) {
+                        startTimer();
+                    }
+                } else {
+                    if (timerRunning) {
+                        stopTimer();
+                    }
+                }
+            }
+            
+            if (data.reps !== undefined && !isPlankExercise) {
+                // Update desktop counter for non-plank exercises
                 repCounter.textContent = data.reps;
                 
                 // CRITICAL FIX FOR MOBILE
@@ -1355,6 +1466,11 @@
             if (exerciseStopped) return;
             exerciseStopped = true;
             exerciseActive = false; // Set exercise as inactive
+
+            // Stop timer if running
+            if (timerRunning) {
+                stopTimer();
+            }
 
             // Close WebSocket connection
             if (ws) {
