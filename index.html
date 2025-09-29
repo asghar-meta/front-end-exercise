@@ -1134,11 +1134,6 @@
                                 keypoints: keypoints,
                                 exercise: exerciseName
                             })
-
-                            logToMobileConsole(
-                                `WebSocket sending ${keypoints.length} keypoints`,
-                                keypoints
-                            );
                             ws.send(JSON.stringify({
                                 type: "keypoints",
                                 keypoints: keypoints,
