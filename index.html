@@ -834,8 +834,7 @@
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', () => {
-            // Create mobile debug console FIRST
-            createMobileDebugConsole();
+            //createMobileDebugConsole();
             
             // Parse URL parameters to get session ID and exercise name
             const urlParams = new URLSearchParams(window.location.search);
@@ -1263,43 +1262,43 @@
         // Initialize WebSocket connection
         function initializeWebSocket() {
             const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws?session_id=${sessionId}`;
-            logToMobileConsole('Connecting to WebSocket', { url: wsUrl });
+            //logToMobileConsole('Connecting to WebSocket', { url: wsUrl });
             
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                logToMobileConsole('WebSocket connected successfully');
+                //logToMobileConsole('WebSocket connected successfully');
                 resetExerciseState();
             };
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    logToMobileConsole('WebSocket message received', data);
+                    //logToMobileConsole('WebSocket message received', data);
                     updateUI(data);
                 } catch (error) {
-                    logToMobileConsole('WebSocket parse error', { error: error.message });
+                    //logToMobileConsole('WebSocket parse error', { error: error.message });
                     console.error("WebSocket parse error:", error);
                 }
             };
 
             ws.onclose = (event) => {
-                logToMobileConsole('WebSocket closed', { 
+                //logToMobileConsole('WebSocket closed', { 
                     code: event.code, 
                     reason: event.reason 
                 });
                 
                 // Only reconnect if exercise is still active
                 if (exerciseActive) {
-                    logToMobileConsole('Attempting to reconnect...');
+                   // logToMobileConsole('Attempting to reconnect...');
                     setTimeout(initializeWebSocket, 2000);
                 }
             };
 
             ws.onerror = (error) => {
-                logToMobileConsole('WebSocket error', { 
-                    message: error.message || 'Unknown error' 
-                });
+                //logToMobileConsole('WebSocket error', { 
+                //    message: error.message || 'Unknown error' 
+                //});
                 console.error("WebSocket error:", error);
             };
         }
@@ -1475,7 +1474,7 @@
             // Close WebSocket connection
             if (ws) {
                 if (ws.readyState === WebSocket.OPEN) {
-                    logToMobileConsole('Closing WebSocket connection');
+                    //logToMobileConsole('Closing WebSocket connection');
                     ws.close(1000, "Exercise stopped by user");
                 }
                 ws = null;
@@ -1512,7 +1511,7 @@
                 });
         }
 
-        function createMobileDebugConsole() {
+        /*function createMobileDebugConsole() {
             // Only create on mobile devices
             if (window.innerWidth > 768) return;
             
@@ -1619,7 +1618,7 @@
             while (window.mobileDebugConsole.children.length > 18) { // 15 + title + close btn
                 window.mobileDebugConsole.removeChild(window.mobileDebugConsole.children[2]); // Skip title and close btn
             }
-        }
+        }*/
 
     </script>
 </body>
