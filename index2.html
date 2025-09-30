@@ -503,7 +503,7 @@
 
             /* Show mobile info panel */
             .mobile-info-panel {
-                display: none;
+                display: block !important;
                 position: absolute;
                 bottom: 70px;
                 left: 0;
@@ -637,6 +637,18 @@
             margin-bottom: 15px;
             color: var(--warning);
         }
+
+        /* Pulse animation for rep counter */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        #rep-counter-mobile.pulse {
+            animation: pulse 0.5s ease-in-out;
+            display: inline-block;
+        }
     </style>
 </head>
 
@@ -662,7 +674,7 @@
             <main class="exercise-container">
                 <div class="stats-panel">
                     <div class="stat-box">
-                        <h3>REPS</h3>
+                        <h3 id="counter-label">REPS</h3>
                         <div id="rep-counter" class="counter">0</div>
                     </div>
 
@@ -678,7 +690,7 @@
                         <span id="exercise-name-mobile">Exercise</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Reps:</span>
+                        <span class="info-label" id="counter-label-mobile">Reps:</span>
                         <span id="rep-counter-mobile">0</span>
                     </div>
                     <div class="info-row">
@@ -722,7 +734,7 @@
     <script>
         // Configuration
         const API_BASE_URL = 'https://yalla-ai.onlinetestingserver.com/v1/exercise';
-        // const API_BASE_URL = 'http://localhost:8000/v1/exercise';
+        //const API_BASE_URL = 'https://jamel-unscored-perdurably.ngrok-free.dev/v1/exercise';
 
         // Global variables
         let ws = null;
@@ -743,10 +755,6 @@
         let jerkRecoveryFrames = 0;
         const JERK_RECOVERY_COUNT = 30;
 
-        // Rep cooldown to prevent multiple counts
-        let lastRepTime = 0;
-        const repCooldownMs = 500; // 1 second cooldown after a rep
-
         // Whole body detection variables
         const bodyVisibilityThreshold = 0.7; // 70% of key points must be visible
         const keyPointVisibilityThreshold = 0.5; // Each key point must be at least 50% visible
@@ -755,6 +763,20 @@
         // Camera ready flags
         let cameraReady = false;
         let firstPoseResultReceived = false;
+        
+        // Timer variables for plank exercises
+        let timerInterval = null;
+        let elapsedTime = 0; // in milliseconds
+        let timerRunning = false;
+        let isPlankExercise = false;
+        let lastTimerUpdate = 0;
+        let overlayActive = false; // Track if overlay is active
+        const validPlankFeedbacks = [
+            "good form",
+            "Hips too high - lower them!",
+            "Hips sagging - lift them up!",
+            "Doing Good Keep it"
+        ];
 
         // DOM Elements
         const exerciseView = document.getElementById('exercise-view');
@@ -768,6 +790,8 @@
         const cameraPermission = document.querySelector('.camera-permission');
         const personDetectionOverlay = document.querySelector('.person-detection-overlay');
         const videoPlaceholder = document.querySelector('.video-placeholder');
+        const counterLabel = document.getElementById('counter-label');
+        const counterLabelMobile = document.getElementById('counter-label-mobile');
 
         // Check if whole body is visible
         function isWholeBodyVisible(landmarks) {
@@ -810,16 +834,27 @@
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', () => {
+            //createMobileDebugConsole();
+            
             // Parse URL parameters to get session ID and exercise name
             const urlParams = new URLSearchParams(window.location.search);
             const urlSessionId = urlParams.get('session_id');
             const urlExerciseName = urlParams.get('exercise');
-
             // Check if we have the required parameters in the URL
             if (urlSessionId && urlExerciseName) {
                 // Use the parameters from the URL
                 sessionId = urlSessionId;
-                exerciseName = urlExerciseName;
+                exerciseName = urlExerciseName.toLowerCase(); // Convert to lowercase for consistent comparison
+                
+                // Check if this is a plank exercise
+                isPlankExercise = exerciseName.includes('plank');
+                
+                // Update UI based on exercise type
+                if (isPlankExercise) {
+                    counterLabel.textContent = 'TIME';
+                    counterLabelMobile.textContent = 'Time:';
+                }
+                
                 exerciseActive = true;
 
                 // Show exercise view and initialize
@@ -892,12 +927,21 @@
             lastFrameTimestamp = null;
             isCameraJerk = false;
             jerkRecoveryFrames = 0;
-            lastRepTime = 0;
+            overlayActive = false;
 
             // Reset overlay and blur
             personDetectionOverlay.classList.remove('active');
             cameraStream.classList.remove('blur');
             poseCanvas.classList.remove('blur');
+            
+            // Reset timer variables
+            elapsedTime = 0;
+            timerRunning = false;
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            updateTimerDisplay();
         }
 
         // Show exercise view with animation
@@ -942,13 +986,14 @@
                 locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
             });
 
+            // UPDATED: Set model complexity to 0 and confidence to 0.7
             pose.setOptions({
-                modelComplexity: 1,
+                modelComplexity: 0,
                 smoothLandmarks: true,
                 enableSegmentation: false,
                 smoothSegmentation: false,
-                minDetectionConfidence: 0.9,
-                minTrackingConfidence: 0.9
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.7
             });
 
             pose.onResults(onPoseResults);
@@ -981,8 +1026,6 @@
                     .then(() => {
                         console.log('Camera started successfully');
 
-                        // Remove the duplicate code that was here
-
                         const waitForVideo = setInterval(() => {
                             if (cameraStream.videoWidth > 0 && cameraStream.videoHeight > 0) {
                                 clearInterval(waitForVideo);
@@ -992,7 +1035,6 @@
                                 poseCanvas.height = cameraStream.videoHeight;
                                 poseCanvas.style.width = '100%';
                                 poseCanvas.style.height = '100%';
-                                console.log(`Canvas set to: ${poseCanvas.width}x${poseCanvas.height}`);
 
                                 // Set a timeout to hide loader if no pose results are received after 5 seconds
                                 setTimeout(() => {
@@ -1084,8 +1126,7 @@
 
                     drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
                     drawLandmarks(canvasCtx, results.poseLandmarks, { color: '#FF0000', lineWidth: 1, radius: 3 });
-                    console.log("Canvas dimensions:", poseCanvas.width, poseCanvas.height);
-                    console.log("Landmarks count:", results.poseLandmarks ? results.poseLandmarks.length : 0);
+
                     const keypoints = results.poseLandmarks.map(landmark => [
                         landmark.x,
                         landmark.y,
@@ -1120,12 +1161,14 @@
                         }
                     }
 
-                    // Check if we're in rep cooldown period
-                    const inRepCooldown = (currentTimestamp - lastRepTime) < repCooldownMs;
-
-                    // Send keypoints if whole body is visible, not in jerk recovery mode, and not in rep cooldown
-                    if (wholeBodyDetected && !isCameraJerk && !inRepCooldown) {
+                    // Send keypoints if whole body is visible and not in jerk recovery mode
+                    if (wholeBodyDetected && !isCameraJerk) {
                         if (ws && ws.readyState === WebSocket.OPEN) {
+                            data = JSON.stringify({
+                                type: "keypoints",
+                                keypoints: keypoints,
+                                exercise: exerciseName
+                            })
                             ws.send(JSON.stringify({
                                 type: "keypoints",
                                 keypoints: keypoints,
@@ -1133,7 +1176,7 @@
                             }));
                         }
                     } else {
-                        console.log(`Ignoring frame: ${!wholeBodyDetected ? 'whole body not visible' : (isCameraJerk ? 'camera jerk' : 'rep cooldown')}`);
+                        console.log(`Ignoring frame: ${!wholeBodyDetected ? 'whole body not visible' : 'camera jerk'}`);
                     }
 
                     lastKeypoints = keypoints;
@@ -1177,10 +1220,17 @@
                 personDetectionOverlay.classList.remove('active');
                 cameraStream.classList.remove('blur');
                 poseCanvas.classList.remove('blur');
+                overlayActive = false;
             } else {
                 personDetectionOverlay.classList.add('active');
                 cameraStream.classList.add('blur');
                 poseCanvas.classList.add('blur');
+                overlayActive = true;
+                
+                // Stop timer if running and this is a plank exercise
+                if (timerRunning && isPlankExercise) {
+                    stopTimer();
+                }
             }
         }
 
@@ -1202,74 +1252,173 @@
             if (mobileFeedbackText) {
                 mobileFeedbackText.textContent = "No person detected";
             }
+            
+            // Stop timer if running
+            if (timerRunning && isPlankExercise) {
+                stopTimer();
+            }
         }
 
         // Initialize WebSocket connection
         function initializeWebSocket() {
             const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws?session_id=${sessionId}`;
+            //logToMobileConsole('Connecting to WebSocket', { url: wsUrl });
+            
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log("WebSocket connected");
+                //logToMobileConsole('WebSocket connected successfully');
                 resetExerciseState();
             };
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    console.log('WebSocket data:', data);
-
-                    // Update rep cooldown if reps increased
-                    if (data.reps !== undefined) {
-                        const currentReps = data.reps;
-                        const previousReps = parseInt(repCounter.textContent) || 0;
-
-                        if (currentReps > previousReps) {
-                            lastRepTime = Date.now();
-                            console.log(`Rep counted! Cooldown started. New rep count: ${currentReps}`);
-
-                            // Add animation effect for rep counter
-                            repCounter.classList.add('pulse');
-                            setTimeout(() => repCounter.classList.remove('pulse'), 1000);
-                        }
-                    }
-
+                    //logToMobileConsole('WebSocket message received', data);
                     updateUI(data);
                 } catch (error) {
+                    //logToMobileConsole('WebSocket parse error', { error: error.message });
                     console.error("WebSocket parse error:", error);
                 }
             };
 
-            ws.onclose = () => {
-                console.log("WebSocket closed");
+            ws.onclose = (event) => {
+                //logToMobileConsole('WebSocket closed', { 
+                //    code: event.code, 
+                    reason: event.reason 
+                //});
+                
                 // Only reconnect if exercise is still active
                 if (exerciseActive) {
+                   // logToMobileConsole('Attempting to reconnect...');
                     setTimeout(initializeWebSocket, 2000);
                 }
             };
 
-            ws.onerror = (error) => console.error("WebSocket error:", error);
+            ws.onerror = (error) => {
+                logToMobileConsole('WebSocket error', { 
+                    message: error.message || 'Unknown error' 
+                });
+                console.error("WebSocket error:", error);
+            };
+        }
+        
+
+        // Format time in MM:SS format
+        function formatTime(milliseconds) {
+            const totalSeconds = Math.floor(milliseconds / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Update timer display
+        function updateTimerDisplay() {
+            if (isPlankExercise) {
+                repCounter.textContent = formatTime(elapsedTime);
+                const mobileRepCounter = document.getElementById('rep-counter-mobile');
+                if (mobileRepCounter) {
+                    mobileRepCounter.textContent = formatTime(elapsedTime);
+                }
+            }
+        }
+
+        // Start timer
+        function startTimer() {
+            if (!isPlankExercise || timerRunning || overlayActive) return;
+            
+            timerRunning = true;
+            lastTimerUpdate = Date.now();
+            
+            timerInterval = setInterval(() => {
+                const now = Date.now();
+                const deltaTime = now - lastTimerUpdate;
+                elapsedTime += deltaTime;
+                lastTimerUpdate = now;
+                updateTimerDisplay();
+            }, 100); // Update every 100ms for smooth display
+        }
+
+        // Stop timer
+        function stopTimer() {
+            if (!isPlankExercise || !timerRunning) return;
+            
+            timerRunning = false;
+            clearInterval(timerInterval);
         }
 
         // Update UI with exercise data
         function updateUI(data) {
+            // Log the received data for debugging
+            if (window.innerWidth <= 768) {
+                console.log('Mobile UI update called with:', data);
+            }
+            
             if (data.exercise) {
                 const mobileExerciseName = document.getElementById('exercise-name-mobile');
                 if (mobileExerciseName) {
                     mobileExerciseName.textContent = data.exercise;
                 }
             }
-            if (data.reps !== undefined) {
-                repCounter.textContent = data.reps;
-                const mobileRepCounter = document.getElementById('rep-counter-mobile');
-                if (mobileRepCounter) {
-                    mobileRepCounter.textContent = data.reps;
-
-                    // Add animation effect for mobile rep counter
-                    mobileRepCounter.classList.add('pulse');
-                    setTimeout(() => mobileRepCounter.classList.remove('pulse'), 1000);
+            
+            // Handle timer for plank exercises
+            if (isPlankExercise && data.feedback !== undefined) {
+                const feedbackTextLower = data.feedback.toLowerCase();
+                
+                // Check if feedback is one of the valid plank feedbacks
+                const isValidPlankFeedback = validPlankFeedbacks.some(feedback => 
+                    feedbackTextLower.includes(feedback.toLowerCase())
+                );
+                
+                if (isValidPlankFeedback && !overlayActive) {
+                    if (!timerRunning) {
+                        startTimer();
+                    }
+                } else {
+                    if (timerRunning) {
+                        stopTimer();
+                    }
                 }
             }
+            
+            if (data.reps !== undefined && !isPlankExercise) {
+                // Update desktop counter for non-plank exercises
+                repCounter.textContent = data.reps;
+                
+                // CRITICAL FIX FOR MOBILE
+                const mobileRepCounter = document.getElementById('rep-counter-mobile');
+                if (mobileRepCounter) {
+                    // Force DOM refresh on mobile
+                    if (window.innerWidth <= 768) {
+                        // Method 1: Direct text update with animation
+                        mobileRepCounter.classList.add('pulse');
+                        mobileRepCounter.textContent = data.reps;
+                        
+                        // Method 2: Force reflow by accessing offsetHeight
+                        void mobileRepCounter.offsetHeight;
+                        
+                        // Method 3: Remove and re-add element to force refresh
+                        const parent = mobileRepCounter.parentNode;
+                        const clone = mobileRepCounter.cloneNode(true);
+                        clone.textContent = data.reps;
+                        parent.replaceChild(clone, mobileRepCounter);
+                        
+                        // Clean up animation
+                        setTimeout(() => {
+                            const newElement = document.getElementById('rep-counter-mobile');
+                            if (newElement) newElement.classList.remove('pulse');
+                        }, 1000);
+                    } else {
+                        // Desktop update
+                        mobileRepCounter.textContent = data.reps;
+                        mobileRepCounter.classList.add('pulse');
+                        setTimeout(() => mobileRepCounter.classList.remove('pulse'), 1000);
+                    }
+                } else {
+                    console.error('Mobile rep counter element not found!');
+                }
+            }
+            
             if (data.form_ok !== undefined) {
                 if (personDetected) {
                     const statusText = data.form_ok ? "OK" : "FIX";
@@ -1283,6 +1432,7 @@
                     }
                 }
             }
+            
             if (data.feedback !== undefined) {
                 if (personDetected) {
                     feedbackText.textContent = data.feedback || "No feedback yet";
@@ -1317,9 +1467,15 @@
             exerciseStopped = true;
             exerciseActive = false; // Set exercise as inactive
 
+            // Stop timer if running
+            if (timerRunning) {
+                stopTimer();
+            }
+
             // Close WebSocket connection
             if (ws) {
                 if (ws.readyState === WebSocket.OPEN) {
+                    //logToMobileConsole('Closing WebSocket connection');
                     ws.close(1000, "Exercise stopped by user");
                 }
                 ws = null;
@@ -1340,6 +1496,10 @@
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' }
             })
+                .then(response => {
+                    console.log('Stop API response:', response);
+                    return response.json();
+                })
                 .catch(error => console.error('Error stopping exercise:', error))
                 .finally(() => {
                     // Redirect to a clean URL without parameters
@@ -1351,7 +1511,116 @@
                     exerciseStopped = false;
                 });
         }
+
+        /*function createMobileDebugConsole() {
+            // Only create on mobile devices
+            if (window.innerWidth > 768) return;
+            
+            // Remove existing console if it exists
+            const existingConsole = document.getElementById('mobile-debug-console');
+            if (existingConsole) {
+                existingConsole.remove();
+            }
+            
+            const debugConsole = document.createElement('div');
+            debugConsole.id = 'mobile-debug-console';
+            debugConsole.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                width: 320px;
+                max-height: 250px;
+                overflow-y: auto;
+                background: rgba(0, 0, 0, 0.95);
+                color: #00ff00;
+                padding: 12px;
+                border-radius: 8px;
+                font-family: monospace;
+                font-size: 12px;
+                z-index: 10000;
+                border: 2px solid #00ff00;
+                box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
+            `;
+            
+            // Add close button
+            const closeBtn = document.createElement('div');
+            closeBtn.textContent = '×';
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: 5px;
+                right: 5px;
+                cursor: pointer;
+                font-size: 18px;
+                color: #ff0000;
+                font-weight: bold;
+            `;
+            closeBtn.onclick = () => debugConsole.style.display = 'none';
+            debugConsole.appendChild(closeBtn);
+            
+            // Add title
+            const title = document.createElement('div');
+            title.textContent = 'WebSocket Data';
+            title.style.cssText = `
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: #00ffff;
+                border-bottom: 1px solid #00ff00;
+                padding-bottom: 5px;
+                text-align: center;
+            `;
+            debugConsole.appendChild(title);
+            
+            // Add to page
+            document.body.appendChild(debugConsole);
+            
+            // Store reference
+            window.mobileDebugConsole = debugConsole;
+            
+            // Log that debug console is ready
+            logToMobileConsole('Debug console initialized');
+        }
+
+        function logToMobileConsole(message, data = null) {
+            if (!window.mobileDebugConsole || window.innerWidth > 768) return;
+            
+            const logEntry = document.createElement('div');
+            logEntry.style.cssText = `
+                margin-bottom: 8px;
+                padding: 5px;
+                background: rgba(0, 50, 0, 0.7);
+                border-radius: 4px;
+                border-left: 3px solid #00ff00;
+            `;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            let logContent = `<div style="color: #ffff00; font-size: 10px;">${timestamp}</div>`;
+            logContent += `<div style="color: #ffffff; margin-top: 3px;">${message}</div>`;
+            
+            if (data) {
+                // Format JSON data nicely
+                let formattedData;
+                if (typeof data === 'object') {
+                    formattedData = JSON.stringify(data, null, 2);
+                } else {
+                    formattedData = String(data);
+                }
+                logContent += `<div style="color: #00ccff; margin-top: 5px; font-size: 11px; white-space: pre-wrap;">${formattedData}</div>`;
+            }
+            
+            logEntry.innerHTML = logContent;
+            
+            // Add to console
+            window.mobileDebugConsole.appendChild(logEntry);
+            
+            // Auto scroll to bottom
+            window.mobileDebugConsole.scrollTop = window.mobileDebugConsole.scrollHeight;
+            
+            // Keep only last 15 entries
+            while (window.mobileDebugConsole.children.length > 18) { // 15 + title + close btn
+                window.mobileDebugConsole.removeChild(window.mobileDebugConsole.children[2]); // Skip title and close btn
+            }
+        }*/
+
     </script>
 </body>
-
 </html>
